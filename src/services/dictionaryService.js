@@ -82,11 +82,16 @@ export const isValidWord = async (word) => {
 // Cache for storing fetched words
 const wordCache = new Map();
 
+// Helper to get a random item from an array
+function getRandomItem(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
+
 export const getRandomWord = async (excludeWords = []) => {
     try {
         // Try to get words from cache first
         let words = wordCache.get('words');
-        
+
         // If not in cache or running low on words, fetch new ones
         if (!words || words.length < 10) {
             words = await getDictionaryWords();
@@ -94,23 +99,33 @@ export const getRandomWord = async (excludeWords = []) => {
         }
 
         // Filter out excluded words
-        const availableWords = words.filter(word => !excludeWords.includes(word));
+        let availableWords = words.filter(word => !excludeWords.includes(word));
 
         // If we're running out of words, fetch new ones
         if (availableWords.length < 5) {
             words = await getDictionaryWords();
             wordCache.set('words', words);
-            return getRandomWord(excludeWords);
+            availableWords = words.filter(word => !excludeWords.includes(word));
         }
 
-        // Get a random word from the available words
-        const randomIndex = Math.floor(Math.random() * availableWords.length);
-        const selectedWord = availableWords[randomIndex];
-
-        // Remove the selected word from the cache to avoid repetition
-        wordCache.set('words', words.filter(w => w !== selectedWord));
-
-        return selectedWord;
+        // Try up to N times to find a word with a clue
+        const maxTries = availableWords.length;
+        for (let i = 0; i < maxTries; i++) {
+            const selectedWord = getRandomItem(availableWords);
+            const def = await getWordDefinition(selectedWord);
+            if (def && def.definitions && def.definitions.length > 0 && def.definitions[0].definition !== 'Definition not available') {
+                // Remove the selected word from the cache to avoid repetition
+                wordCache.set('words', words.filter(w => w !== selectedWord));
+                return selectedWord;
+            } else {
+                // Remove this word from availableWords and try again
+                availableWords = availableWords.filter(w => w !== selectedWord);
+            }
+        }
+        // If no word with a clue is found, fetch a new batch and try again
+        words = await getDictionaryWords();
+        wordCache.set('words', words);
+        return getRandomWord(excludeWords);
     } catch (error) {
         console.error('Error getting random word:', error);
         return 'ERROR';
@@ -146,17 +161,14 @@ export const getDictionaryWords = async () => {
             const words = await response.json();
             console.log(`Received ${words.length} words starting with ${randomLetter}`);
             
-            // Filter and add valid words to the set
-            words
-                .filter(word => {
-                    const wordStr = word.word.toUpperCase();
-                    return !isCommonWord(wordStr) && /^[A-Z]{5}$/i.test(word.word);
-                })
-                .forEach(word => {
-                    const upperWord = word.word.toUpperCase();
-                    apiWords.add(upperWord);
-                    validWordCache.add(upperWord); // Add to cache for future validation
-                });
+            // Filter and add valid words to the set (no definition check here)
+            for (const wordObj of words) {
+                const wordStr = wordObj.word.toUpperCase();
+                if (!isCommonWord(wordStr) && /^[A-Z]{5}$/i.test(wordObj.word)) {
+                    apiWords.add(wordStr);
+                    validWordCache.add(wordStr); // Add to cache for future validation
+                }
+            }
         }
 
         const allWords = [...apiWords];
