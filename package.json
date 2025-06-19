@@ -2,7 +2,7 @@
   "name": "my-hangman",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://feltonjsd8.github.io/word-games",
+  "homepage": "https://feltonjsd8.github.io/eleanordle",
   "dependencies": {
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
