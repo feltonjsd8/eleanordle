@@ -6,9 +6,6 @@ const Menu = ({ onSelectGame }) => {
     <div className="game-menu">
       <h1>Word Games</h1>
       <div className="menu-buttons">
-        <button onClick={() => onSelectGame('hangman')}>
-          Hangman
-        </button>
         <button onClick={() => onSelectGame('wordle')}>
           Eleanordle
         </button>
