@@ -21,6 +21,7 @@ const Wordle = ({ onBackToMenu }) => {
   const [showClue, setShowClue] = useState(false);
   const [clue, setClue] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [revealedAnswerRow, setRevealedAnswerRow] = useState(null);
   const menuRef = useRef();
 
   const startNewGame = async () => {
@@ -245,6 +246,11 @@ const Wordle = ({ onBackToMenu }) => {
       classes.push('flip'); // Only flip when revealed
     }
 
+    // Add class for revealed answer row
+    if (rowIndex === revealedAnswerRow) {
+      classes.push('revealed-answer');
+    }
+
     return classes.join(' ');
   };
 
@@ -281,13 +287,17 @@ const Wordle = ({ onBackToMenu }) => {
 
   const revealAnswer = async () => {
     if (gameOver) return;
-    // Fill the current row with the correct answer and animate as if guessed
+    let revealRow = guesses.findIndex(g => g === '');
+    if (revealRow === -1) revealRow = guesses.length - 1;
+
+    setRevealedAnswerRow(revealRow); // Mark this row as the revealed answer row
+
     const answer = targetWord;
     const evaluation = evaluateGuess(answer, targetWord);
     const newGuesses = [...guesses];
     const newEvaluations = [...evaluations];
-    newGuesses[currentRow] = answer;
-    newEvaluations[currentRow] = evaluation;
+    newGuesses[revealRow] = answer;
+    newEvaluations[revealRow] = evaluation;
     setGuesses(newGuesses);
     setEvaluations(newEvaluations);
     setCurrentGuess('');
@@ -295,12 +305,12 @@ const Wordle = ({ onBackToMenu }) => {
     // Reset revealedLetters for this row
     setRevealedLetters(prev => {
       const updated = prev.map(arr => [...arr]);
-      updated[currentRow] = Array(5).fill(false);
+      updated[revealRow] = Array(5).fill(false);
       return updated;
     });
 
     // Reveal each letter with a delay
-    revealRowLetters(currentRow);
+    revealRowLetters(revealRow);
 
     // Update letter states for keyboard
     const newLetterStates = { ...letterStates };
@@ -365,12 +375,14 @@ const Wordle = ({ onBackToMenu }) => {
                   className={`wordle-tile ${getTileClass(guess[index], index, rowIndex)}`}
                   style={getFlipDelay(index)}
                 >
-                  {/* Only show the letter for submitted rows if revealed, or for current row as you type */}
-                  {rowIndex < currentRow
-                    ? (revealedLetters[rowIndex][index] ? guess[index] : '')
-                    : rowIndex === currentRow && index < currentGuess.length
-                      ? currentGuess[index]
-                      : ''}
+                  {/* Show the correct answer letters in white for the revealed answer row, regardless of animation */}
+                  {rowIndex === revealedAnswerRow
+                    ? guess[index] || ''
+                    : rowIndex < currentRow
+                      ? (revealedLetters[rowIndex][index] ? guess[index] : '')
+                      : rowIndex === currentRow && index < currentGuess.length
+                        ? currentGuess[index]
+                        : ''}
                 </div>
               ))}
             </div>
