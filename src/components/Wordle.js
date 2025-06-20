@@ -12,7 +12,7 @@ const Wordle = ({ onBackToMenu }) => {
   const [message, setMessage] = useState('');
   const [letterStates, setLetterStates] = useState({});
   const [evaluations, setEvaluations] = useState(Array(6).fill(null));
-  const [revealedLetters, setRevealedLetters] = useState(Array(6).fill(Array(5).fill(false)));
+  const [revealedLetters, setRevealedLetters] = useState(Array(6).fill(null).map(() => Array(5).fill(false)));
   const [isLoading, setIsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [wordDefinition, setWordDefinition] = useState(null);
@@ -35,7 +35,7 @@ const Wordle = ({ onBackToMenu }) => {
       setMessage('');
       setLetterStates({});
       setEvaluations(Array(6).fill(null));
-      setRevealedLetters(Array(6).fill(Array(5).fill(false)));
+      setRevealedLetters(Array(6).fill(null).map(() => Array(5).fill(false)));
       setIsSuccess(false);
       setCompletedWord('');
       setShowClue(false);
@@ -133,7 +133,20 @@ const Wordle = ({ onBackToMenu }) => {
     setShowModal(true);
   };
 
-  // Modify submitGuess to track category progress
+  // Helper to reveal each letter in the row with a delay
+  const revealRowLetters = (rowIndex) => {
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => {
+        setRevealedLetters(prev => {
+          const updated = prev.map(arr => [...arr]);
+          updated[rowIndex][i] = true;
+          return updated;
+        });
+      }, i * 200); // 200ms per tile
+    }
+  };
+
+  // Modify submitGuess to reveal letters one by one
   const submitGuess = async () => {
     // First validate that the guess is a real word
     const isValid = await isValidWord(currentGuess);
@@ -143,17 +156,27 @@ const Wordle = ({ onBackToMenu }) => {
     }
 
     const evaluation = evaluateGuess(currentGuess, targetWord);
-    
+
     // Update evaluations
     const newEvaluations = [...evaluations];
     newEvaluations[currentRow] = evaluation;
     setEvaluations(newEvaluations);
-    
+
     // Update guesses
     const newGuesses = [...guesses];
     newGuesses[currentRow] = currentGuess;
     setGuesses(newGuesses);
-    
+
+    // Reset revealedLetters for this row
+    setRevealedLetters(prev => {
+      const updated = prev.map(arr => [...arr]);
+      updated[currentRow] = Array(5).fill(false);
+      return updated;
+    });
+
+    // Reveal each letter with a delay
+    revealRowLetters(currentRow);
+
     // Update letter states for keyboard
     const newLetterStates = { ...letterStates };
     for (let i = 0; i < currentGuess.length; i++) {
@@ -169,34 +192,33 @@ const Wordle = ({ onBackToMenu }) => {
       }
     }
     setLetterStates(newLetterStates);
-    
+
     // Check if game is over
     if (currentGuess === targetWord) {
-      setGameOver(true);
-      setIsSuccess(true);
-      setCompletedWord(targetWord);
-      // Get definition for the modal
-      try {
-        const def = await getWordDefinition(targetWord);
-        setWordDefinition(def);
-        setShowModal(true);
-      } catch (error) {
-        console.error('Error fetching definition:', error);
-      }
+      setTimeout(() => {
+        setGameOver(true);
+        setIsSuccess(true);
+        setCompletedWord(targetWord);
+        // Get definition for the modal
+        getWordDefinition(targetWord).then(def => {
+          setWordDefinition(def);
+          setShowModal(true);
+        }).catch(() => {});
+      }, 5 * 200 + 200); // Wait for all tiles to flip
     } else if (currentRow === 5) {
-      setGameOver(true);
-      setCompletedWord(targetWord);
-      // Get definition for the modal
-      try {
-        const def = await getWordDefinition(targetWord);
-        setWordDefinition(def);
-        setShowModal(true);
-      } catch (error) {
-        console.error('Error fetching definition:', error);
-      }
+      setTimeout(() => {
+        setGameOver(true);
+        setCompletedWord(targetWord);
+        getWordDefinition(targetWord).then(def => {
+          setWordDefinition(def);
+          setShowModal(true);
+        }).catch(() => {});
+      }, 5 * 200 + 200);
     } else {
-      setCurrentRow(currentRow + 1);
-      setCurrentGuess('');
+      setTimeout(() => {
+        setCurrentRow(currentRow + 1);
+        setCurrentGuess('');
+      }, 5 * 200 + 100);
     }
   };
 
@@ -205,27 +227,24 @@ const Wordle = ({ onBackToMenu }) => {
     setTimeout(() => setMessage(''), 2000);
   };  const getTileClass = (letter, index, rowIndex) => {
     if (rowIndex > currentRow) return '';
-    
+
     const classes = [];
-    
-    // Add evaluation classes for submitted rows
+
+    // Add evaluation classes for submitted rows, but only if revealed
     if (rowIndex < currentRow) {
       const evaluation = evaluations[rowIndex];
-      if (evaluation) {
+      if (evaluation && revealedLetters[rowIndex][index]) {
         classes.push(evaluation[index]);
+        classes.push('flip'); // Only flip when revealed
       }
     }
-    
-    // Add flip animation class for the last submitted row
-    if (rowIndex === currentRow - 1 || (rowIndex === currentRow && gameOver)) {
-      classes.push('flip');
-    }
-    
-    // Handle correct guess case
-    if (rowIndex === currentRow && evaluations[rowIndex]) {
+
+    // Handle correct guess case (current row, after evaluation, and revealed)
+    if (rowIndex === currentRow && evaluations[rowIndex] && revealedLetters[rowIndex][index]) {
       classes.push(evaluations[rowIndex][index]);
+      classes.push('flip'); // Only flip when revealed
     }
-    
+
     return classes.join(' ');
   };
 
@@ -272,9 +291,17 @@ const Wordle = ({ onBackToMenu }) => {
     setGuesses(newGuesses);
     setEvaluations(newEvaluations);
     setCurrentGuess('');
-    setGameOver(true);
-    setIsSuccess(true);
-    setCompletedWord(targetWord);
+
+    // Reset revealedLetters for this row
+    setRevealedLetters(prev => {
+      const updated = prev.map(arr => [...arr]);
+      updated[currentRow] = Array(5).fill(false);
+      return updated;
+    });
+
+    // Reveal each letter with a delay
+    revealRowLetters(currentRow);
+
     // Update letter states for keyboard
     const newLetterStates = { ...letterStates };
     for (let i = 0; i < answer.length; i++) {
@@ -282,8 +309,12 @@ const Wordle = ({ onBackToMenu }) => {
       newLetterStates[letter] = evaluation[i];
     }
     setLetterStates(newLetterStates);
+
     // Show modal after animation
     setTimeout(async () => {
+      setGameOver(true);
+      setIsSuccess(true);
+      setCompletedWord(targetWord);
       try {
         const def = await getWordDefinition(targetWord);
         setWordDefinition(def);
@@ -291,7 +322,7 @@ const Wordle = ({ onBackToMenu }) => {
       } catch (error) {
         setShowModal(true);
       }
-    }, 1200);
+    }, 5 * 200 + 200);
     setMenuOpen(false);
   };
 
@@ -334,9 +365,12 @@ const Wordle = ({ onBackToMenu }) => {
                   className={`wordle-tile ${getTileClass(guess[index], index, rowIndex)}`}
                   style={getFlipDelay(index)}
                 >
-                  {rowIndex === currentRow && index < currentGuess.length
-                    ? currentGuess[index]
-                    : guess[index] || ''}
+                  {/* Only show the letter for submitted rows if revealed, or for current row as you type */}
+                  {rowIndex < currentRow
+                    ? (revealedLetters[rowIndex][index] ? guess[index] : '')
+                    : rowIndex === currentRow && index < currentGuess.length
+                      ? currentGuess[index]
+                      : ''}
                 </div>
               ))}
             </div>
