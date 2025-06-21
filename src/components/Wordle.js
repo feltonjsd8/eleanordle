@@ -338,6 +338,23 @@ const Wordle = ({ onBackToMenu }) => {
 
   return (
     <div className="wordle">
+      {/* Visually hidden input for accessibility and to ensure input is always captured */}
+      <input
+        type="text"
+        value={currentGuess}
+        maxLength={5}
+        autoFocus
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          width: '1px',
+          height: '1px',
+          opacity: 0,
+        }}
+        tabIndex={-1}
+        aria-label="Wordle guess input"
+      />
+
       <div className="game-header">
         <div className="header-content">
           <h1>Eleanordle</h1>
