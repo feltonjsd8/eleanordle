@@ -371,9 +371,9 @@ const Wordle = ({ onBackToMenu }) => {
           </button>
           {menuOpen && (
             <div className="burger-dropdown" ref={menuRef}>
-              <button onClick={getClue} className="dropdown-item" disabled={showClue}>Get Clue</button>
-              <button onClick={startNewGame} className="dropdown-item">New Game</button>
-              <button onClick={revealAnswer} className="dropdown-item">Reveal</button>
+              <button onClick={() => { getClue(); setMenuOpen(false); }} className="dropdown-item" disabled={showClue}>Get Clue</button>
+              <button onClick={() => { startNewGame(); setMenuOpen(false); }} className="dropdown-item">New Game</button>
+              <button onClick={() => { revealAnswer(); setMenuOpen(false); }} className="dropdown-item">Reveal</button>
             </div>
           )}
         </div>
