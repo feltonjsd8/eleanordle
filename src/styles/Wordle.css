@@ -174,6 +174,9 @@
   background: #787c7e;
   color: #fff;
 }
+.wordle-tile.invalid {
+  color: #b91c1c !important;
+}
 
 .keyboard {
   display: flex;

@@ -22,6 +22,7 @@ const Wordle = ({ onBackToMenu }) => {
   const [clue, setClue] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [revealedAnswerRow, setRevealedAnswerRow] = useState(null);
+  const [invalidGuess, setInvalidGuess] = useState(false);
   const menuRef = useRef();
 
   const startNewGame = async () => {
@@ -63,11 +64,19 @@ const Wordle = ({ onBackToMenu }) => {
       }
       submitGuess();
     } else if (key === 'BACKSPACE') {
-      setCurrentGuess(prev => prev.slice(0, -1));
+      setCurrentGuess(prev => {
+        const newGuess = prev.slice(0, -1);
+        if (invalidGuess && newGuess.length < 5) setInvalidGuess(false);
+        return newGuess;
+      });
     } else if (currentGuess.length < 5) {
       // Only allow letters
       if (/^[A-Z]$/.test(key)) {
-        setCurrentGuess(prev => prev + key);
+        setCurrentGuess(prev => {
+          const newGuess = prev + key;
+          if (invalidGuess && newGuess.length < 5) setInvalidGuess(false);
+          return newGuess;
+        });
       }
     }
   };
@@ -86,6 +95,17 @@ const Wordle = ({ onBackToMenu }) => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentGuess, gameOver]);
+
+  useEffect(() => {
+    if (currentGuess.length === 5) {
+      (async () => {
+        const isValid = await isValidWord(currentGuess);
+        setInvalidGuess(!isValid);
+      })();
+    } else if (invalidGuess && currentGuess.length < 5) {
+      setInvalidGuess(false);
+    }
+  }, [currentGuess]);
 
   const evaluateGuess = (guess, target) => {
     const evaluation = Array(5).fill('incorrect');
@@ -152,7 +172,6 @@ const Wordle = ({ onBackToMenu }) => {
     // First validate that the guess is a real word
     const isValid = await isValidWord(currentGuess);
     if (!isValid) {
-      showMessage('Not a valid word');
       return;
     }
 
@@ -379,7 +398,12 @@ const Wordle = ({ onBackToMenu }) => {
         </div>
       </div>
 
-      {message && <div className="message">{message}</div>}
+      {/* Move the message above the game-container and add a higher z-index/style for visibility */}
+      {message && (
+        <div className="message" style={{ position: 'relative', zIndex: 10, margin: '12px 0', fontWeight: 'bold', color: '#b91c1c', background: '#fffbe6', border: '1px solid #fbbf24', borderRadius: 6, padding: '8px 16px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+          {message}
+        </div>
+      )}
       {isLoading && <div className="loading">Loading words...</div>}
 
       <div className="game-container">
@@ -389,7 +413,7 @@ const Wordle = ({ onBackToMenu }) => {
               {Array.from({ length: 5 }, (_, index) => (
                 <div
                   key={index}
-                  className={`wordle-tile ${getTileClass(guess[index], index, rowIndex)}`}
+                  className={`wordle-tile ${getTileClass(guess[index], index, rowIndex)}${rowIndex === currentRow && invalidGuess ? ' invalid' : ''}`}
                   style={getFlipDelay(index)}
                 >
                   {/* Show the correct answer letters in white for the revealed answer row, regardless of animation */}
@@ -462,3 +486,6 @@ const Wordle = ({ onBackToMenu }) => {
 };
 
 export default Wordle;
+
+// Add to the bottom of the file (or in your CSS):
+// .wordle-tile.invalid { color: #b91c1c !important; border-color: #b91c1c !important; }
