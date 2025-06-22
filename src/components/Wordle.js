@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import '../styles/Wordle.css';
 import { getRandomWord, getWordDefinition, isValidWord } from '../services/dictionaryService';
 import WordModal from './WordModal';
@@ -24,6 +24,7 @@ const Wordle = ({ onBackToMenu }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [revealedAnswerRow, setRevealedAnswerRow] = useState(null);
   const [invalidGuess, setInvalidGuess] = useState(false);
+  const [pendingSuggestion, setPendingSuggestion] = useState(false);
   const menuRef = useRef();
 
   const startNewGame = async () => {
@@ -278,7 +279,7 @@ const Wordle = ({ onBackToMenu }) => {
     '--flip-delay': `${index * 200}ms`
   });
 
-  const getClue = async () => {
+  const getClue = useCallback(async () => {
     if (!targetWord) return;
     try {
       const def = await getWordDefinition(targetWord);
@@ -288,7 +289,7 @@ const Wordle = ({ onBackToMenu }) => {
       setClue('No clue available');
       setShowClue(true);
     }
-  };
+  }, [targetWord]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -357,9 +358,8 @@ const Wordle = ({ onBackToMenu }) => {
   };
 
   // Replace handleShowSuggestions to auto-pick and submit a suggestion
-  const handleShowSuggestions = async () => {
+  const handleShowSuggestions = useCallback(async () => {
     setIsLoading(true);
-    // Extract correct, present, and absent letters from current state
     const correct = Array(5).fill(null);
     const present = new Set();
     const absent = new Set();
@@ -375,17 +375,24 @@ const Wordle = ({ onBackToMenu }) => {
         else if (evalRow[i] === 'incorrect') absent.add(letter);
       }
     }
-    // Dynamically import to avoid circular deps
     const { getWordFinderSuggestions } = await import('../services/suggestionService');
     const words = await getWordFinderSuggestions(correct, present, absent);
     setIsLoading(false);
     if (words.length > 0) {
       setCurrentGuess(words[Math.floor(Math.random() * words.length)]);
-      setTimeout(() => submitGuess(), 0);
+      setPendingSuggestion(true);
     } else {
       showMessage('No suggestions found');
     }
-  };
+  }, [evaluations, guesses]);
+
+  // Effect to auto-submit after suggestion is set
+  useEffect(() => {
+    if (pendingSuggestion && currentGuess.length === 5) {
+      setPendingSuggestion(false);
+      submitGuess();
+    }
+  }, [pendingSuggestion, currentGuess]);
 
   // Compute absent letters: guessed but not in targetWord
   const absentLetters = Array.from(new Set(
@@ -394,6 +401,29 @@ const Wordle = ({ onBackToMenu }) => {
       .split('')
       .filter(l => l && !targetWord.includes(l))
   ));
+
+  // Keyboard shortcuts for menu options
+  useEffect(() => {
+    const handleMenuShortcuts = (e) => {
+      if (e.altKey && e.shiftKey && !e.ctrlKey) {
+        if (e.key.toLowerCase() === 'c') {
+          e.preventDefault();
+          if (!showClue) getClue();
+        } else if (e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          handleShowSuggestions();
+        } else if (e.key.toLowerCase() === 'n') {
+          e.preventDefault();
+          startNewGame();
+        } else if (e.key.toLowerCase() === 'r') {
+          e.preventDefault();
+          revealAnswer();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleMenuShortcuts);
+    return () => window.removeEventListener('keydown', handleMenuShortcuts);
+  }, [showClue, getClue, handleShowSuggestions]);
 
   return (
     <div className="wordle">
@@ -478,8 +508,8 @@ const Wordle = ({ onBackToMenu }) => {
         <div className="keyboard">
           {[
             'QWERTYUIOP', // 10 keys: Q W E R T Y U I O P
-            'ASDFGHJKLZ', // 10 keys: A S D F G H J K L Z
-            'XCVBNM',     // 6 keys: X C V B N M
+            'ASDFGHJKL', // 9 keys: A S D F G H J K L
+            'ZXCVBNM',     // 7 keys: Z X C V B N M
           ].map((row, i) => (
             <div key={i} className="keyboard-row">
               {/* Place ENTER and BACKSPACE on the last row */}
@@ -527,6 +557,3 @@ const Wordle = ({ onBackToMenu }) => {
 };
 
 export default Wordle;
-
-// Add to the bottom of the file (or in your CSS):
-// .wordle-tile.invalid { color: #b91c1c !important; border-color: #b91c1c !important; }
