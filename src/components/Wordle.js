@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import '../styles/Wordle.css';
 import { getRandomWord, getWordDefinition, isValidWord } from '../services/dictionaryService';
 import WordModal from './WordModal';
+import { getSuggestions } from '../services/suggestionService';
 
 const Wordle = ({ onBackToMenu }) => {
   const [guesses, setGuesses] = useState(Array(6).fill(''));
@@ -355,6 +356,45 @@ const Wordle = ({ onBackToMenu }) => {
     setMenuOpen(false);
   };
 
+  // Replace handleShowSuggestions to auto-pick and submit a suggestion
+  const handleShowSuggestions = async () => {
+    setIsLoading(true);
+    // Extract correct, present, and absent letters from current state
+    const correct = Array(5).fill(null);
+    const present = new Set();
+    const absent = new Set();
+    for (let row = 0; row < evaluations.length; row++) {
+      const evalRow = evaluations[row];
+      const guess = guesses[row] || '';
+      if (!evalRow) continue;
+      for (let i = 0; i < 5; i++) {
+        const letter = guess[i]?.toUpperCase();
+        if (!letter) continue;
+        if (evalRow[i] === 'correct') correct[i] = letter;
+        else if (evalRow[i] === 'wrong-position') present.add(letter);
+        else if (evalRow[i] === 'incorrect') absent.add(letter);
+      }
+    }
+    // Dynamically import to avoid circular deps
+    const { getWordFinderSuggestions } = await import('../services/suggestionService');
+    const words = await getWordFinderSuggestions(correct, present, absent);
+    setIsLoading(false);
+    if (words.length > 0) {
+      setCurrentGuess(words[Math.floor(Math.random() * words.length)]);
+      setTimeout(() => submitGuess(), 0);
+    } else {
+      showMessage('No suggestions found');
+    }
+  };
+
+  // Compute absent letters: guessed but not in targetWord
+  const absentLetters = Array.from(new Set(
+    guesses
+      .join('')
+      .split('')
+      .filter(l => l && !targetWord.includes(l))
+  ));
+
   return (
     <div className="wordle">
       {/* Visually hidden input for accessibility and to ensure input is always captured */}
@@ -391,6 +431,7 @@ const Wordle = ({ onBackToMenu }) => {
           {menuOpen && (
             <div className="burger-dropdown" ref={menuRef}>
               <button onClick={() => { getClue(); setMenuOpen(false); }} className="dropdown-item" disabled={showClue}>Get Clue</button>
+              <button onClick={() => { handleShowSuggestions(); setMenuOpen(false); }} className="dropdown-item">Suggest Word</button>
               <button onClick={() => { startNewGame(); setMenuOpen(false); }} className="dropdown-item">New Game</button>
               <button onClick={() => { revealAnswer(); setMenuOpen(false); }} className="dropdown-item">Reveal</button>
             </div>
