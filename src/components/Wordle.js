@@ -490,10 +490,10 @@ const Wordle = ({ onBackToMenu }) => {
                   {/* Show the correct answer letters in white for the revealed answer row, regardless of animation */}
                   {rowIndex === revealedAnswerRow
                     ? guess[index] || ''
-                    : rowIndex < currentRow
-                      ? (revealedLetters[rowIndex][index] ? guess[index] : '')
-                      : rowIndex === currentRow && index < currentGuess.length
-                        ? currentGuess[index]
+                    : rowIndex < currentRow // For completed rows, always show the guess.
+                      ? guess[index] || ''
+                      : (rowIndex === currentRow && index < currentGuess.length)
+                        ? currentGuess[index] // For the current row, show the typed letters.
                         : ''}
                 </div>
               ))}
