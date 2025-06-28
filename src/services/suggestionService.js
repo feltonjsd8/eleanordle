@@ -106,36 +106,51 @@ export async function getDatamuseValidSuggestions(correct, present) {
 }
 
 /**
- * Get up to 10 5-letter words from WordFinder API containing all correct and present letters in the right positions, omitting any invalid letters.
+ * Get up to 20 5-letter word suggestions from the Datamuse API.
+ * This function replaces the WordFinder API to resolve CORS issues.
+ * It fetches a list of words matching known correct letters and then filters
+ * them on the client-side based on present and absent letters.
  * @param {string[]} correct - Array of 5 elements, correct[i] is the letter at position i or null.
  * @param {Set<string>} present - Set of letters that must be present somewhere in the word.
  * @param {Set<string>} absent - Set of letters that must NOT be present in the word.
  * @returns {Promise<string[]>}
  */
 export async function getWordFinderSuggestions(correct, present, absent = new Set()) {
-  // Build contains pattern, e.g. 'a____'
-  const contains = correct.map(l => l ? l.toLowerCase() : '_').join('');
-  // Build include_letters string
-  const includeLetters = Array.from(new Set([...present, ...correct.filter(Boolean)])).join('').toLowerCase();
-  // Build exclude_letters string
-  const excludeLetters = Array.from(absent).join('').toLowerCase();
-  let url = `https://fly.wordfinderapi.com/api/search?contains=${contains}&include_letters=${includeLetters}&length=5&word_sorting=az&group_by_length=true&page_size=20&dictionary=wordle`;
-  if (excludeLetters) {
-    url += `&exclude_letters=${excludeLetters}`;
-  }
+  // Build the 'spelled-like' pattern for Datamuse, e.g., 'a?p?l'
+  const pattern = correct.map(l => (l ? l.toLowerCase() : '?')).join('');
+  const url = `https://api.datamuse.com/words?sp=${pattern}&max=1000`;
+
   try {
     const resp = await fetch(url);
-    const data = await resp.json();
-    // API returns { word_pages: [ { word_list: [ { word: 'apple' }, ... ] }, ... ] }
-    let words = [];
-    if (Array.isArray(data.word_pages)) {
-      words = data.word_pages.flatMap(page =>
-        Array.isArray(page.word_list) ? page.word_list : []
-      );
+    if (!resp.ok) {
+      console.error('Datamuse API request failed:', resp.status);
+      return [];
     }
-    words = words.map(w => w.word.toUpperCase()).filter(word => word.length === 5);
-    return words.slice(0, 10);
+    const data = await resp.json();
+
+    const suggestions = data
+      .map(w => w.word.toUpperCase())
+      .filter(word => {
+        if (word.length !== 5 || !/^[A-Z]{5}$/.test(word)) {
+          return false;
+        }
+
+        // Rule 1: Must not contain any absent letters.
+        for (const letter of absent) {
+          if (word.includes(letter)) return false;
+        }
+
+        // Rule 2: Must contain all 'present' letters.
+        for (const letter of present) {
+          if (!word.includes(letter)) return false;
+        }
+
+        return true;
+      });
+
+    return suggestions.slice(0, 20);
   } catch (e) {
+    console.error('Error fetching suggestions from Datamuse:', e);
     return [];
   }
 }
