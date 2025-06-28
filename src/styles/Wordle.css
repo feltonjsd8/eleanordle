@@ -21,6 +21,10 @@
   text-align: center;
 }
 
+.title-highlight {
+  color: #e83e8c; /* A nice shade of pink */
+}
+
 .header-actions {
   grid-column: 3;
   justify-self: end;
@@ -298,7 +302,7 @@
     font-size: 0.95rem;
     border-radius: 6px;
     max-width: 12vw;
-    padding: 0 0.2vw;
+    padding: 0;
   }
   .key[data-key="ENTER"],
   .key[data-key="BACKSPACE"] {
@@ -318,7 +322,7 @@
   .key {
     min-width: 32px;
     height: 42px;
-    padding: 0 7px;
+    padding: 0;
     font-size: 0.95rem;
     border-radius: 6px;
   }
@@ -326,6 +330,23 @@
   .key[data-key="BACKSPACE"] {
     min-width: 48px;
     font-size: 0.85rem;
+  }
+}
+
+/* Further adjustments for very small screens */
+@media (max-width: 375px) {
+  .keyboard {
+    gap: 10px;
+  }
+
+  .key {
+    height: 38px;
+    font-size: 0.85rem;
+  }
+
+  .key[data-key="ENTER"],
+  .key[data-key="BACKSPACE"] {
+    font-size: 0.75rem;
   }
 }
 
