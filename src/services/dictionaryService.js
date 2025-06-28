@@ -158,6 +158,13 @@ export const getDictionaryWords = async () => {
                 continue;
             }
 
+            // The Datamuse API can return 202 Accepted if it's under load.
+            // This response has no body, so we should skip it and continue the loop.
+            if (response.status === 202) {
+                console.warn(`Datamuse API returned 202 Accepted for letter ${randomLetter}. Skipping.`);
+                continue;
+            }
+
             const words = await response.json();
             console.log(`Received ${words.length} words starting with ${randomLetter}`);
             
