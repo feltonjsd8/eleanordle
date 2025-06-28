@@ -448,24 +448,30 @@ const Wordle = ({ onBackToMenu }) => {
         <div className="header-content">
           <h1>Eleanordle</h1>
         </div>
-        <div className="burger-menu-anchor">
-          <button
-            className="burger-menu-btn"
-            aria-label="Open menu"
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            <span className="burger-bar"></span>
-            <span className="burger-bar"></span>
-            <span className="burger-bar"></span>
+        <div className="header-actions">
+          <button onClick={getClue} className="header-icon-btn" disabled={showClue} title="Get Clue (Alt+Shift+C)" aria-label="Get Clue">
+            💡
           </button>
-          {menuOpen && (
-            <div className="burger-dropdown" ref={menuRef}>
-              <button onClick={() => { getClue(); setMenuOpen(false); }} className="dropdown-item" disabled={showClue}>Get Clue</button>
-              <button onClick={() => { handleShowSuggestions(); setMenuOpen(false); }} className="dropdown-item">Suggest Word</button>
-              <button onClick={() => { startNewGame(); setMenuOpen(false); }} className="dropdown-item">New Game</button>
-              <button onClick={() => { revealAnswer(); setMenuOpen(false); }} className="dropdown-item">Reveal</button>
-            </div>
-          )}
+          <button onClick={handleShowSuggestions} className="header-icon-btn" title="Suggest Word (Alt+Shift+S)" aria-label="Suggest Word">
+            🔍
+          </button>
+          <div className="burger-menu-anchor">
+            <button
+              className="burger-menu-btn"
+              aria-label="Open menu"
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              <span className="burger-bar"></span>
+              <span className="burger-bar"></span>
+              <span className="burger-bar"></span>
+            </button>
+            {menuOpen && (
+              <div className="burger-dropdown" ref={menuRef}>
+                <button onClick={() => { startNewGame(); setMenuOpen(false); }} className="dropdown-item">New Game</button>
+                <button onClick={() => { revealAnswer(); setMenuOpen(false); }} className="dropdown-item">Reveal</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
