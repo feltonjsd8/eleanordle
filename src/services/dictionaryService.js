@@ -1,5 +1,5 @@
 const DATAMUSE_API_URL = 'https://api.datamuse.com/words';
-const DICTIONARY_API_URL = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
+const DICTIONARY_API_URL = 'https://api.dictionaryapi.dev/api/v2/entries/en_GB/';
 
 // Cache for valid words to reduce API calls
 const validWordCache = new Set();

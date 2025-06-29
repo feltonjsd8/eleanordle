@@ -1,4 +1,4 @@
-import { getDictionaryWords } from '../services/dictionaryService';
+import { getDictionaryWords, isValidWord } from '../services/dictionaryService';
 
 describe('Dictionary Service - Countries', () => {
     it('should return valid 5-letter country names', async () => {
@@ -15,3 +15,10 @@ describe('Dictionary Service - Countries', () => {
         });
     });
 });
+
+describe('Dictionary Service - UK English', () => {
+    it('should return true for a valid UK spelling', async () => {
+        const isValid = await isValidWord('COLOUR');
+        expect(isValid).toBe(true);
+    });
+});""
