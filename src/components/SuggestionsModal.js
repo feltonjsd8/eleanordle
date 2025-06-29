@@ -8,10 +8,13 @@ const SuggestionsModal = ({ isOpen, onClose, evaluations, guesses, onPickSuggest
   useEffect(() => {
     if (!isOpen) return;
     setLoading(true);
-    // Extract correct, present, and absent letters
+    // Extract correct, present, and absent letters from all previous guesses.
     const correct = Array(5).fill(null);
     const present = new Set();
     const absent = new Set();
+    const allCorrectOrPresentLetters = new Set();
+
+    // First pass: identify all correct and present letters to avoid incorrectly marking them as absent.
     for (let row = 0; row < evaluations.length; row++) {
       const evalRow = evaluations[row];
       const guess = guesses[row] || '';
@@ -19,9 +22,29 @@ const SuggestionsModal = ({ isOpen, onClose, evaluations, guesses, onPickSuggest
       for (let i = 0; i < 5; i++) {
         const letter = guess[i]?.toUpperCase();
         if (!letter) continue;
-        if (evalRow[i] === 'correct') correct[i] = letter;
-        else if (evalRow[i] === 'wrong-position') present.add(letter);
-        else if (evalRow[i] === 'incorrect') absent.add(letter);
+        if (evalRow[i] === 'correct') {
+          correct[i] = letter;
+          allCorrectOrPresentLetters.add(letter);
+        } else if (evalRow[i] === 'wrong-position') {
+          present.add(letter);
+          allCorrectOrPresentLetters.add(letter);
+        }
+      }
+    }
+
+    // Second pass: identify absent letters, ensuring they are not also correct or present.
+    // This handles cases where a letter appears twice in a guess (e.g., 'SASSY') and one
+    // instance is correct/present while the other is not.
+    for (let row = 0; row < evaluations.length; row++) {
+      const evalRow = evaluations[row];
+      const guess = guesses[row] || '';
+      if (!evalRow) continue;
+      for (let i = 0; i < 5; i++) {
+        const letter = guess[i]?.toUpperCase();
+        if (!letter) continue;
+        if (evalRow[i] === 'incorrect' && !allCorrectOrPresentLetters.has(letter)) {
+          absent.add(letter);
+        }
       }
     }
     import('../services/suggestionService').then(({ getWordFinderSuggestions }) =>
