@@ -25,6 +25,7 @@ const Wordle = ({ onBackToMenu }) => {
   const [revealedAnswerRow, setRevealedAnswerRow] = useState(null);
   const [invalidGuess, setInvalidGuess] = useState(false);
   const [pendingSuggestion, setPendingSuggestion] = useState(false);
+  const [usedSuggestions, setUsedSuggestions] = useState([]);
   const menuRef = useRef();
 
   const startNewGame = async () => {
@@ -44,6 +45,7 @@ const Wordle = ({ onBackToMenu }) => {
       setCompletedWord('');
       setShowClue(false);
       setClue('');
+      setUsedSuggestions([]);
     } catch (error) {
       console.error('Error selecting word:', error);
       showMessage('Error loading word. Please try again.');
@@ -376,13 +378,16 @@ const Wordle = ({ onBackToMenu }) => {
       }
     }
     const { getWordFinderSuggestions } = await import('../services/suggestionService');
-    const words = await getWordFinderSuggestions(correct, present, absent);
+    const words = await getWordFinderSuggestions(correct, present, absent, targetWord);
+    const availableWords = words.filter(word => !usedSuggestions.includes(word));
     setIsLoading(false);
-    if (words.length > 0) {
-      setCurrentGuess(words[Math.floor(Math.random() * words.length)]);
+    if (availableWords.length > 0) {
+      const newSuggestion = availableWords[Math.floor(Math.random() * availableWords.length)];
+      setUsedSuggestions([...usedSuggestions, newSuggestion]);
+      setCurrentGuess(newSuggestion);
       setPendingSuggestion(true);
     } else {
-      showMessage('No suggestions found');
+      showMessage('No new suggestions found');
     }
   }, [evaluations, guesses]);
 

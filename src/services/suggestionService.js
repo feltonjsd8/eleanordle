@@ -115,7 +115,7 @@ export async function getDatamuseValidSuggestions(correct, present) {
  * @param {Set<string>} absent - Set of letters that must NOT be present in the word.
  * @returns {Promise<string[]>}
  */
-export async function getWordFinderSuggestions(correct, present, absent = new Set()) {
+export async function getWordFinderSuggestions(correct, present, absent = new Set(), targetWord) {
   // Build the 'spelled-like' pattern for Datamuse, e.g., 'a?p?l'
   const pattern = correct.map(l => (l ? l.toLowerCase() : '?')).join('');
   const url = `https://api.datamuse.com/words?sp=${pattern}&max=1000`;
@@ -131,7 +131,7 @@ export async function getWordFinderSuggestions(correct, present, absent = new Se
     const suggestions = data
       .map(w => w.word.toUpperCase())
       .filter(word => {
-        if (word.length !== 5 || !/^[A-Z]{5}$/.test(word)) {
+        if (word.length !== 5 || !/^[A-Z]{5}$/.test(word) || word === targetWord) {
           return false;
         }
 
