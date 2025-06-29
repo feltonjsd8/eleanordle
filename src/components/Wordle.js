@@ -26,6 +26,7 @@ const Wordle = ({ onBackToMenu }) => {
   const [invalidGuess, setInvalidGuess] = useState(false);
   const [pendingSuggestion, setPendingSuggestion] = useState(false);
   const [usedSuggestions, setUsedSuggestions] = useState([]);
+  const inputRef = useRef();
   const menuRef = useRef();
 
   const startNewGame = async () => {
@@ -287,6 +288,7 @@ const Wordle = ({ onBackToMenu }) => {
       const def = await getWordDefinition(targetWord);
       setClue(def.definitions[0]?.definition || 'No clue available');
       setShowClue(true);
+      inputRef.current?.focus();
     } catch (e) {
       setClue('No clue available');
       setShowClue(true);
@@ -434,6 +436,7 @@ const Wordle = ({ onBackToMenu }) => {
     <div className="wordle">
       {/* Visually hidden input for accessibility and to ensure input is always captured */}
       <input
+        ref={inputRef}
         type="text"
         value={currentGuess}
         maxLength={5}
@@ -506,13 +509,7 @@ const Wordle = ({ onBackToMenu }) => {
                   style={getFlipDelay(index)}
                 >
                   {/* Show the correct answer letters in white for the revealed answer row, regardless of animation */}
-                  {rowIndex === revealedAnswerRow
-                    ? guess[index] || ''
-                    : rowIndex < currentRow // For completed rows, always show the guess.
-                      ? guess[index] || ''
-                      : (rowIndex === currentRow && index < currentGuess.length)
-                        ? currentGuess[index] // For the current row, show the typed letters.
-                        : ''}
+                  {rowIndex === currentRow ? currentGuess[index] || '' : guesses[rowIndex][index] || ''}
                 </div>
               ))}
             </div>
