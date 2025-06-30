@@ -289,7 +289,6 @@ const Wordle = ({ onBackToMenu }) => {
       const def = await getWordDefinition(targetWord);
       setClue(def.definitions[0]?.definition || 'No clue available');
       setShowClue(true);
-      inputRef.current?.focus();
     } catch (e) {
       setClue('No clue available');
       setShowClue(true);
