@@ -34,4 +34,39 @@ describe('Wordle Component', () => {
     expect(screen.getByText('U')).toBeInTheDocument();
     expect(screen.getByText('E')).toBeInTheDocument();
   });
+
+  it('should display the correct answer when the reveal button is clicked', async () => {
+    render(<Wordle />);
+
+    // Wait for the game to load
+    await screen.findByText('Eleanordle');
+
+    // Click the reveal button
+    fireEvent.click(screen.getByText('Reveal'));
+
+    // Check that the correct answer is displayed
+    expect(screen.getByText('A')).toBeInTheDocument();
+    expect(screen.getByText('P')).toBeInTheDocument();
+    expect(screen.getByText('L')).toBeInTheDocument();
+    expect(screen.getByText('E')).toBeInTheDocument();
+  });
+
+  it('should not show the answer at the start of a new game after being revealed', async () => {
+    render(<Wordle />);
+
+    // Wait for the game to load
+    await screen.findByText('Eleanordle');
+
+    // Click the reveal button
+    fireEvent.click(screen.getByText('Reveal'));
+
+    // Start a new game
+    fireEvent.click(screen.getByText('New Game'));
+
+    // Check that the answer is not displayed
+    expect(screen.queryByText('A')).not.toBeInTheDocument();
+    expect(screen.queryByText('P')).not.toBeInTheDocument();
+    expect(screen.queryByText('L')).not.toBeInTheDocument();
+    expect(screen.queryByText('E')).not.toBeInTheDocument();
+  });
 });

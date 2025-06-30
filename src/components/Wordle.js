@@ -47,6 +47,7 @@ const Wordle = ({ onBackToMenu }) => {
       setShowClue(false);
       setClue('');
       setUsedSuggestions([]);
+      setRevealedAnswerRow(null);
     } catch (error) {
       console.error('Error selecting word:', error);
       showMessage('Error loading word. Please try again.');
@@ -509,7 +510,7 @@ const Wordle = ({ onBackToMenu }) => {
                   style={getFlipDelay(index)}
                 >
                   {/* Show the correct answer letters in white for the revealed answer row, regardless of animation */}
-                  {rowIndex === currentRow ? currentGuess[index] || '' : guesses[rowIndex][index] || ''}
+                  {rowIndex === revealedAnswerRow ? targetWord[index] : (rowIndex === currentRow ? currentGuess[index] || '' : guesses[rowIndex][index] || '')}
                 </div>
               ))}
             </div>
