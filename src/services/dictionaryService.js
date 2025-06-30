@@ -1,5 +1,13 @@
+import { RegExpMatcher, englishDataset, englishRecommendedTransformers } from 'obscenity';
+
 const DATAMUSE_API_URL = 'https://api.datamuse.com/words';
 const DICTIONARY_API_URL = 'https://api.dictionaryapi.dev/api/v2/entries/en_GB/';
+
+// Create a matcher instance for profanity checking
+const matcher = new RegExpMatcher({
+    ...englishDataset.build(),
+    ...englishRecommendedTransformers,
+});
 
 // Cache for valid words to reduce API calls
 const validWordCache = new Set();
@@ -178,7 +186,8 @@ export const getDictionaryWords = async () => {
             }
         }
 
-        const allWords = [...apiWords];
+        // Use matcher.hasMatch to filter out profane words
+        const allWords = [...apiWords].filter(word => !matcher.hasMatch(word));
         console.log(`Found ${allWords.length} valid words across different starting letters`);
 
         if (allWords.length === 0) {

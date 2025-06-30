@@ -16,6 +16,15 @@ describe('Dictionary Service - Countries', () => {
     });
 });
 
+describe('Dictionary Service - Profanity Filter', () => {
+    it('should filter out inappropriate words', async () => {
+        const words = await getDictionaryWords();
+        expect(words).not.toContain('BITCH');
+        expect(words).not.toContain('JIHAD');
+        expect(words).not.toContain('NIGGA');
+    });
+});
+
 describe('Dictionary Service - UK English', () => {
     it('should return true for a valid UK spelling', async () => {
         const isValid = await isValidWord('COLOUR');
