@@ -365,8 +365,9 @@ const Wordle = ({ onBackToMenu }) => {
   const handleShowSuggestions = useCallback(async () => {
     setIsLoading(true);
     const correct = Array(5).fill(null);
-    const present = new Set();
-    const absent = new Set();
+    const wrongPosition = new Set();
+    const present = new Set(); // <-- Add this line
+    const absent = new Set();  // <-- Add this line
     for (let row = 0; row < evaluations.length; row++) {
       const evalRow = evaluations[row];
       const guess = guesses[row] || '';
@@ -375,12 +376,14 @@ const Wordle = ({ onBackToMenu }) => {
         const letter = guess[i]?.toUpperCase();
         if (!letter) continue;
         if (evalRow[i] === 'correct') correct[i] = letter;
-        else if (evalRow[i] === 'wrong-position') present.add(letter);
-        else if (evalRow[i] === 'incorrect') absent.add(letter);
+        else if (evalRow[i] === 'wrong-position') {
+          present.add(letter);
+          wrongPosition.add(`${letter}-${i}`);
+        } else if (evalRow[i] === 'incorrect') absent.add(letter);
       }
     }
     const { getWordFinderSuggestions } = await import('../services/suggestionService');
-    const words = await getWordFinderSuggestions(correct, present, absent, targetWord);
+    const words = await getWordFinderSuggestions(correct, present, absent, targetWord, wrongPosition);
     const availableWords = words.filter(word => !usedSuggestions.includes(word));
     setIsLoading(false);
     if (availableWords.length > 0) {

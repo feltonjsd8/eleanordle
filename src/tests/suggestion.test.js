@@ -32,4 +32,20 @@ describe('Suggestion Logic', () => {
     expect(secondSuggestion).not.toBe(firstSuggestion);
     expect(availableWords).not.toContain(firstSuggestion);
   });
+
+  it('should not suggest a word with a letter in the same wrong position', async () => {
+    const suggestions = ['CRANE', 'TRACE', 'GRACE'];
+    getWordFinderSuggestions.mockResolvedValue(suggestions);
+
+    const correct = [];
+    const present = new Set(['R']);
+    const absent = new Set();
+    const targetWord = 'TOWER';
+    const wrongPosition = new Set(['R-1']); // R was in the wrong position at index 1
+
+    const newSuggestions = await getWordFinderSuggestions(correct, present, absent, targetWord, wrongPosition);
+
+    // The new suggestion should not have R at index 1
+    expect(newSuggestions.every(word => word[1] !== 'R')).toBe(true);
+  });
 });
