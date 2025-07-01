@@ -69,4 +69,26 @@ describe('Wordle Component', () => {
     expect(screen.queryByText('L')).not.toBeInTheDocument();
     expect(screen.queryByText('E')).not.toBeInTheDocument();
   });
+
+  it('should fetch more words if no suggestions are found', async () => {
+    const { getWordFinderSuggestions, getDictionaryWords } = require('../services/suggestionService');
+    getWordFinderSuggestions.mockResolvedValueOnce([]); // No initial suggestions
+    getDictionaryWords.mockResolvedValueOnce(['GRAPE', 'LEMON']); // New words to fetch
+
+    render(<Wordle />);
+
+    // Wait for the game to load
+    await screen.findByText('Eleanordle');
+
+    // Click the suggest word button
+    fireEvent.click(screen.getByLabelText('Suggest Word'));
+
+    // Check that a new suggestion is displayed
+    expect(await screen.findByText('G')).toBeInTheDocument();
+    expect(await screen.findByText('R')).toBeInTheDocument();
+    expect(await screen.findByText('A')).toBeInTheDocument();
+    expect(await screen.findByText('P
+')).toBeInTheDocument();
+    expect(await screen.findByText('E')).toBeInTheDocument();
+  });
 });

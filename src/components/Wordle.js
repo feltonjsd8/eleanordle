@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import '../styles/Wordle.css';
-import { getRandomWord, getWordDefinition, isValidWord } from '../services/dictionaryService';
+import { getRandomWord, getWordDefinition, isValidWord, getDictionaryWords } from '../services/dictionaryService';
 import WordModal from './WordModal';
 import { getSuggestions } from '../services/suggestionService';
 
@@ -392,7 +392,19 @@ const Wordle = ({ onBackToMenu }) => {
       setCurrentGuess(newSuggestion);
       setPendingSuggestion(true);
     } else {
-      showMessage('No new suggestions found');
+      // If no suggestions are found, fetch more words and try again
+      setIsLoading(true);
+      const newWords = await getDictionaryWords();
+      const newAvailableWords = newWords.filter(word => !usedSuggestions.includes(word));
+      setIsLoading(false);
+      if (newAvailableWords.length > 0) {
+        const newSuggestion = newAvailableWords[Math.floor(Math.random() * newAvailableWords.length)];
+        setUsedSuggestions([...usedSuggestions, newSuggestion]);
+        setCurrentGuess(newSuggestion);
+        setPendingSuggestion(true);
+      } else {
+        showMessage('No new suggestions found');
+      }
     }
   }, [evaluations, guesses]);
 
