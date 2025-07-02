@@ -131,6 +131,8 @@
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 5px;
+  position: relative;
+  padding-left: 30px; /* Space for the icon */
 }
 
 .wordle-tile {
@@ -419,4 +421,23 @@
     width: 20px;
     height: 20px;
   }
+}
+
+.definition-icon-btn {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000; /* Black color */
+  opacity: 1; /* Always visible */
+  transition: background 0.3s, color 0.3s;
 }

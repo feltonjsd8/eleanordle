@@ -4,7 +4,7 @@ import './styles/App.css';
 
 const App = () => {
   return (
-    <div className="app">
+    <div className="App">
       <Wordle/>
     </div>
   );
