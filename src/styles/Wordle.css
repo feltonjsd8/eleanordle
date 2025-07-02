@@ -176,6 +176,22 @@
 }
 
 /* Only apply evaluation color if the tile is revealed (has correct/wrong-position/incorrect class) */
+.wordle.contrast .wordle-tile.correct {
+  background-color: #f5793a;
+}
+
+.wordle.contrast .wordle-tile.wrong-position {
+  background-color: #85c0f9;
+}
+
+.wordle.contrast .key.correct {
+  background-color: #f5793a;
+}
+
+.wordle.contrast .key.wrong-position {
+  background-color: #85c0f9;
+}
+
 .wordle-tile.correct {
   background: #6aaa64;
   color: #fff;

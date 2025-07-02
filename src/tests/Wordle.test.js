@@ -91,4 +91,20 @@ describe('Wordle Component', () => {
 ')).toBeInTheDocument();
     expect(await screen.findByText('E')).toBeInTheDocument();
   });
+
+  it('should toggle contrast mode', async () => {
+    render(<Wordle />);
+
+    // Wait for the game to load
+    await screen.findByText('Eleanordle');
+
+    // Click the burger menu button
+    fireEvent.click(screen.getByLabelText('Open menu'));
+
+    // Click the contrast mode button
+    fireEvent.click(screen.getByText('Contrast Mode'));
+
+    // Check that the contrast class is applied
+    expect(screen.getByText('Eleanordle').parentElement.parentElement.parentElement).toHaveClass('contrast');
+  });
 });

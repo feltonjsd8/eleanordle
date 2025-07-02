@@ -26,6 +26,7 @@ const Wordle = ({ onBackToMenu }) => {
   const [invalidGuess, setInvalidGuess] = useState(false);
   const [pendingSuggestion, setPendingSuggestion] = useState(false);
   const [usedSuggestions, setUsedSuggestions] = useState([]);
+  const [isContrastMode, setIsContrastMode] = useState(false);
   const inputRef = useRef();
   const menuRef = useRef();
 
@@ -448,7 +449,7 @@ const Wordle = ({ onBackToMenu }) => {
   }, [showClue, getClue, handleShowSuggestions]);
 
   return (
-    <div className="wordle">
+    <div className={`wordle ${isContrastMode ? 'contrast' : ''}`}>
       {/* Visually hidden input for accessibility and to ensure input is always captured */}
       <input
         ref={inputRef}
@@ -499,6 +500,7 @@ const Wordle = ({ onBackToMenu }) => {
               <div className="burger-dropdown" ref={menuRef}>
                 <button onClick={() => { startNewGame(); setMenuOpen(false); }} className="dropdown-item">New Game</button>
                 <button onClick={() => { revealAnswer(); setMenuOpen(false); }} className="dropdown-item">Reveal</button>
+                <button onClick={() => setIsContrastMode(!isContrastMode)} className="dropdown-item">Contrast Mode</button>
               </div>
             )}
           </div>
