@@ -149,6 +149,7 @@
   transition: background 0.3s, color 0.3s;
   perspective: 1000px;
   transform-style: preserve-3d;
+  position: relative; /* Added for positioning contrast icons */
 }
 
 .wordle-tile.flip {
@@ -245,6 +246,7 @@
   transition: background-color 0.2s;
   touch-action: manipulation;
   max-width: 10vw;
+  position: relative; /* Added for positioning contrast icons */
 }
 
 .key[data-key="ENTER"],
@@ -439,5 +441,24 @@
   justify-content: center;
   color: #000; /* Black color */
   opacity: 1; /* Always visible */
-  transition: background 0.3s, color 0.3s;
+}
+
+.contrast-icon {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000; /* Black color for contrast icons */
+  background-color: transparent; /* Ensure no background interferes */
+  pointer-events: none; /* Allow clicks to pass through to the tile */
+}
+
+.contrast-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
 }
