@@ -107,6 +107,8 @@ const Wordle = ({ onBackToMenu }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
   const inputRef = useRef();
   const menuRef = useRef();
+  // Cache for word definitions to avoid unnecessary API calls
+  const definitionCache = useRef({});
 
   const startNewGame = async () => {
     dispatch({ type: 'SET_IS_LOADING', isLoading: true });
@@ -217,11 +219,17 @@ const Wordle = ({ onBackToMenu }) => {
   const handleShowDefinition = async (word) => {
     dispatch({ type: 'SET_DEFINITION_MODAL_WORD', definitionModalWord: word });
     try {
-      const definition = await getWordDefinition(word);
+      let definition = definitionCache.current[word];
+      if (!definition) {
+        definition = await getWordDefinition(word);
+        definitionCache.current[word] = definition;
+      }
       dispatch({ type: 'SET_DEFINITION_MODAL_DEFINITION', definitionModalDefinition: definition });
     } catch (error) {
       console.error('Error fetching definition:', error);
-      dispatch({ type: 'SET_DEFINITION_MODAL_DEFINITION', definitionModalDefinition: { word, definitions: [{ definition: 'Definition not available' }] } });
+      const fallback = { word, definitions: [{ definition: 'Definition not available' }] };
+      definitionCache.current[word] = fallback;
+      dispatch({ type: 'SET_DEFINITION_MODAL_DEFINITION', definitionModalDefinition: fallback });
     }
     dispatch({ type: 'SET_SHOW_DEFINITION_MODAL', showDefinitionModal: true });
   };
@@ -263,6 +271,17 @@ const Wordle = ({ onBackToMenu }) => {
       }
     }
     dispatch({ type: 'SET_LETTER_STATES', letterStates: newLetterStates });
+
+    // Prefetch and cache the definition for the guess (if not already cached)
+    const guessWord = state.currentGuess;
+    if (!definitionCache.current[guessWord]) {
+      getWordDefinition(guessWord).then(def => {
+        definitionCache.current[guessWord] = def;
+      }).catch(() => {
+        definitionCache.current[guessWord] = { word: guessWord, definitions: [{ definition: 'Definition not available' }] };
+      });
+    }
+
     if (state.currentGuess === state.targetWord) {
       setTimeout(() => {
         dispatch({ type: 'SET_GAME_OVER', gameOver: true });
@@ -529,49 +548,66 @@ const Wordle = ({ onBackToMenu }) => {
       {state.isLoading && <div className="loading">Loading words...</div>}
       <div className="game-container">
         <div className="wordle-grid">
-          {state.guesses.map((guess, rowIndex) => (
-            <div key={rowIndex} className="wordle-row">
-              {rowIndex < state.currentRow && state.guesses[rowIndex] && (
-                <button
-                  className="definition-icon-btn"
-                  onClick={() => handleShowDefinition(state.guesses[rowIndex])}
-                  title={`View definition of ${state.guesses[rowIndex]}`}
-                  aria-label={`View definition of ${state.guesses[rowIndex]}`}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" height="30px" viewBox="0 0 24 24" width="30px" fill="currentColor">
-                    <path d="M0 0h24v24H0V0z" fill="none"/>
-                    <path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/>
-                  </svg>
-                </button>
-              )}
-              {Array.from({ length: 5 }, (_, index) => (
-                <div
-                  key={index}
-                  className={`wordle-tile ${getTileClass(guess[index], index, rowIndex)}${rowIndex === state.currentRow && state.invalidGuess ? ' invalid' : ''}`}
-                  style={getFlipDelay(index)}
-                >
-                  {rowIndex === state.revealedAnswerRow ? state.targetWord[index] : (rowIndex === state.currentRow ? state.currentGuess[index] || '' : state.guesses[rowIndex][index] || '')}
-                  {state.isContrastMode && state.evaluations[rowIndex] && state.revealedLetters[rowIndex][index] && (
-                    <div className="contrast-icon">
-                      {state.evaluations[rowIndex][index] === 'correct' && (
-                        <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
-                          <path d="M0 0h24v24H0V0z" fill="none"/>
-                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-                        </svg>
-                      )}
-                      {state.evaluations[rowIndex][index] === 'wrong-position' && (
-                        <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
-                          <path d="M0 0h24v24H0V0z" fill="none"/>
-                          <path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/>
-                        </svg>
-                      )}
-                    </div>
-                  )}
-                  
-                </div>
-              ))}
-            </div>
-          ))}
+          {state.guesses.map((guess, rowIndex) => {
+            let showDefinitionIcon = false;
+            if (rowIndex < state.currentRow && state.guesses[rowIndex]) {
+              const cached = definitionCache.current[state.guesses[rowIndex]];
+              if (
+                cached &&
+                Array.isArray(cached.definitions) &&
+                cached.definitions[0]?.definition &&
+                cached.definitions[0].definition !== 'Definition not available'
+              ) {
+                // Only show icon if a real definition is cached
+                showDefinitionIcon = true;
+              } else {
+                showDefinitionIcon = false;
+              }
+            }
+            return (
+              <div key={rowIndex} className="wordle-row">
+                {rowIndex < state.currentRow && state.guesses[rowIndex] && showDefinitionIcon && (
+                  <button
+                    className="definition-icon-btn"
+                    onClick={() => handleShowDefinition(state.guesses[rowIndex])}
+                    title={`View definition of ${state.guesses[rowIndex]}`}
+                    aria-label={`View definition of ${state.guesses[rowIndex]}`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" height="30px" viewBox="0 0 24 24" width="30px" fill="currentColor">
+                      <path d="M0 0h24v24H0V0z" fill="none"/>
+                      <path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/>
+                    </svg>
+                  </button>
+                )}
+                {Array.from({ length: 5 }, (_, index) => (
+                  <div
+                    key={index}
+                    className={`wordle-tile ${getTileClass(guess[index], index, rowIndex)}${rowIndex === state.currentRow && state.invalidGuess ? ' invalid' : ''}`}
+                    style={getFlipDelay(index)}
+                  >
+                    {rowIndex === state.revealedAnswerRow ? state.targetWord[index] : (rowIndex === state.currentRow ? state.currentGuess[index] || '' : state.guesses[rowIndex][index] || '')}
+                    {state.isContrastMode && state.evaluations[rowIndex] && state.revealedLetters[rowIndex][index] && (
+                      <div className="contrast-icon">
+                        {state.evaluations[rowIndex][index] === 'correct' && (
+                          <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                            <path d="M0 0h24v24H0V0z" fill="none"/>
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                          </svg>
+                        )}
+                        {state.evaluations[rowIndex][index] === 'wrong-position' && (
+                          <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                            <path d="M0 0h24v24H0V0z" fill="none"/>
+                            <path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/>
+                          </svg>
+                        )}
+                      </div>
+                    )}
+                    
+                  </div>
+                ))}
+              </div>
+            );
+          })}
         </div>
         {state.showClue && state.clue && (
           <div className="clue-text" style={{marginBottom: 8, color: '#1a73e8', fontStyle: 'italic'}}>
