@@ -1,93 +1,149 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useReducer, useEffect, useRef, useCallback } from 'react';
 import '../styles/Wordle.css';
 import { getRandomWord, getWordDefinition, isValidWord, getDictionaryWords } from '../services/dictionaryService';
 import WordModal from './WordModal';
 import DefinitionModal from './DefinitionModal';
 import { getSuggestions } from '../services/suggestionService';
 
+const initialState = {
+  guesses: Array(6).fill(''),
+  currentGuess: '',
+  currentRow: 0,
+  targetWord: '',
+  gameOver: false,
+  message: '',
+  letterStates: {},
+  evaluations: Array(6).fill(null),
+  revealedLetters: Array(6).fill(null).map(() => Array(5).fill(false)),
+  isLoading: false,
+  showModal: false,
+  wordDefinition: null,
+  isSuccess: false,
+  completedWord: '',
+  showClue: false,
+  clue: '',
+  menuOpen: false,
+  showDefinitionModal: false,
+  definitionModalWord: null,
+  definitionModalDefinition: null,
+  revealedAnswerRow: null,
+  invalidGuess: false,
+  pendingSuggestion: false,
+  usedSuggestions: [],
+  isContrastMode: false,
+};
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'RESET':
+      return { ...initialState, targetWord: action.targetWord };
+    case 'SET_GUESSES':
+      return { ...state, guesses: action.guesses };
+    case 'SET_CURRENT_GUESS':
+      return { ...state, currentGuess: action.currentGuess };
+    case 'SET_CURRENT_ROW':
+      return { ...state, currentRow: action.currentRow };
+    case 'SET_GAME_OVER':
+      return { ...state, gameOver: action.gameOver };
+    case 'SET_MESSAGE':
+      return { ...state, message: action.message };
+    case 'SET_LETTER_STATES':
+      return { ...state, letterStates: action.letterStates };
+    case 'SET_EVALUATIONS':
+      return { ...state, evaluations: action.evaluations };
+    case 'SET_REVEALED_LETTERS':
+      return { ...state, revealedLetters: action.revealedLetters };
+    case 'SET_IS_LOADING':
+      return { ...state, isLoading: action.isLoading };
+    case 'SET_SHOW_MODAL':
+      return { ...state, showModal: action.showModal };
+    case 'SET_WORD_DEFINITION':
+      return { ...state, wordDefinition: action.wordDefinition };
+    case 'SET_IS_SUCCESS':
+      return { ...state, isSuccess: action.isSuccess };
+    case 'SET_COMPLETED_WORD':
+      return { ...state, completedWord: action.completedWord };
+    case 'SET_SHOW_CLUE':
+      return { ...state, showClue: action.showClue };
+    case 'SET_CLUE':
+      return { ...state, clue: action.clue };
+    case 'SET_MENU_OPEN':
+      return { ...state, menuOpen: action.menuOpen };
+    case 'SET_SHOW_DEFINITION_MODAL':
+      return { ...state, showDefinitionModal: action.showDefinitionModal };
+    case 'SET_DEFINITION_MODAL_WORD':
+      return { ...state, definitionModalWord: action.definitionModalWord };
+    case 'SET_DEFINITION_MODAL_DEFINITION':
+      return { ...state, definitionModalDefinition: action.definitionModalDefinition };
+    case 'SET_REVEALED_ANSWER_ROW':
+      return { ...state, revealedAnswerRow: action.revealedAnswerRow };
+    case 'SET_INVALID_GUESS':
+      return { ...state, invalidGuess: action.invalidGuess };
+    case 'SET_PENDING_SUGGESTION':
+      return { ...state, pendingSuggestion: action.pendingSuggestion };
+    case 'SET_USED_SUGGESTIONS':
+      return { ...state, usedSuggestions: action.usedSuggestions };
+    case 'SET_IS_CONTRAST_MODE':
+      return { ...state, isContrastMode: action.isContrastMode };
+    case 'SET_TARGET_WORD':
+      return { ...state, targetWord: action.targetWord };
+    case 'REVEAL_LETTER': {
+      // Reveal a single letter in a row
+      const { rowIndex, letterIndex } = action;
+      const revealedLetters = state.revealedLetters.map((arr, idx) => {
+        if (idx !== rowIndex) return arr;
+        const newArr = arr.slice();
+        newArr[letterIndex] = true;
+        return newArr;
+      });
+      return { ...state, revealedLetters };
+    }
+    default:
+      return state;
+  }
+}
+
 const Wordle = ({ onBackToMenu }) => {
-  const [guesses, setGuesses] = useState(Array(6).fill(''));
-  const [currentGuess, setCurrentGuess] = useState('');
-  const [currentRow, setCurrentRow] = useState(0);
-  const [targetWord, setTargetWord] = useState('');
-  const [gameOver, setGameOver] = useState(false);
-  const [message, setMessage] = useState('');
-  const [letterStates, setLetterStates] = useState({});
-  const [evaluations, setEvaluations] = useState(Array(6).fill(null));
-  const [revealedLetters, setRevealedLetters] = useState(Array(6).fill(null).map(() => Array(5).fill(false)));
-  const [isLoading, setIsLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [wordDefinition, setWordDefinition] = useState(null);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [completedWord, setCompletedWord] = useState('');
-  const [showClue, setShowClue] = useState(false);
-  const [clue, setClue] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [showDefinitionModal, setShowDefinitionModal] = useState(false);
-  const [definitionModalWord, setDefinitionModalWord] = useState(null);
-  const [definitionModalDefinition, setDefinitionModalDefinition] = useState(null);
-  const [revealedAnswerRow, setRevealedAnswerRow] = useState(null);
-  const [invalidGuess, setInvalidGuess] = useState(false);
-  const [pendingSuggestion, setPendingSuggestion] = useState(false);
-  const [usedSuggestions, setUsedSuggestions] = useState([]);
-  const [isContrastMode, setIsContrastMode] = useState(false);
+  const [state, dispatch] = useReducer(reducer, initialState);
   const inputRef = useRef();
   const menuRef = useRef();
 
   const startNewGame = async () => {
-    setIsLoading(true);
+    dispatch({ type: 'SET_IS_LOADING', isLoading: true });
     try {
       const newWord = await getRandomWord();
-      setTargetWord(newWord);
-      setGuesses(Array(6).fill(''));
-      setCurrentGuess('');
-      setCurrentRow(0);
-      setGameOver(false);
-      setMessage('');
-      setLetterStates({});
-      setEvaluations(Array(6).fill(null));
-      setRevealedLetters(Array(6).fill(null).map(() => Array(5).fill(false)));
-      setIsSuccess(false);
-      setCompletedWord('');
-      setShowClue(false);
-      setClue('');
-      setUsedSuggestions([]);
-      setRevealedAnswerRow(null);
+      dispatch({ type: 'RESET', targetWord: newWord });
     } catch (error) {
       console.error('Error selecting word:', error);
       showMessage('Error loading word. Please try again.');
     } finally {
-      setIsLoading(false);
+      dispatch({ type: 'SET_IS_LOADING', isLoading: false });
     }
   };
 
   useEffect(() => {
     startNewGame();
+    // eslint-disable-next-line
   }, []);
 
   const handleKeyPress = (key) => {
-    if (gameOver) return;
+    if (state.gameOver) return;
 
     if (key === 'ENTER') {
-      if (currentGuess.length !== 5) {
+      if (state.currentGuess.length !== 5) {
         showMessage('Word must be 5 letters');
         return;
       }
       submitGuess();
     } else if (key === 'BACKSPACE') {
-      setCurrentGuess(prev => {
-        const newGuess = prev.slice(0, -1);
-        if (invalidGuess && newGuess.length < 5) setInvalidGuess(false);
-        return newGuess;
-      });
-    } else if (currentGuess.length < 5) {
-      // Only allow letters
+      const newGuess = state.currentGuess.slice(0, -1);
+      if (state.invalidGuess && newGuess.length < 5) dispatch({ type: 'SET_INVALID_GUESS', invalidGuess: false });
+      dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: newGuess });
+    } else if (state.currentGuess.length < 5) {
       if (/^[A-Z]$/.test(key)) {
-        setCurrentGuess(prev => {
-          const newGuess = prev + key;
-          if (invalidGuess && newGuess.length < 5) setInvalidGuess(false);
-          return newGuess;
-        });
+        const newGuess = state.currentGuess + key;
+        if (state.invalidGuess && newGuess.length < 5) dispatch({ type: 'SET_INVALID_GUESS', invalidGuess: false });
+        dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: newGuess });
       }
     }
   };
@@ -105,25 +161,24 @@ const Wordle = ({ onBackToMenu }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentGuess, gameOver]);
+    // eslint-disable-next-line
+  }, [state.currentGuess, state.gameOver]);
 
   useEffect(() => {
-    if (currentGuess.length === 5) {
+    if (state.currentGuess.length === 5) {
       (async () => {
-        const isValid = await isValidWord(currentGuess);
-        setInvalidGuess(!isValid);
+        const isValid = await isValidWord(state.currentGuess);
+        dispatch({ type: 'SET_INVALID_GUESS', invalidGuess: !isValid });
       })();
-    } else if (invalidGuess && currentGuess.length < 5) {
-      setInvalidGuess(false);
+    } else if (state.invalidGuess && state.currentGuess.length < 5) {
+      dispatch({ type: 'SET_INVALID_GUESS', invalidGuess: false });
     }
-  }, [currentGuess]);
+  }, [state.currentGuess]);
 
   const evaluateGuess = (guess, target) => {
     const evaluation = Array(5).fill('incorrect');
     const targetLetters = target.split('');
     const guessLetters = guess.split('');
-    
-    // First pass: mark correct positions
     for (let i = 0; i < 5; i++) {
       if (guessLetters[i] === targetLetters[i]) {
         evaluation[i] = 'correct';
@@ -131,171 +186,132 @@ const Wordle = ({ onBackToMenu }) => {
         guessLetters[i] = null;
       }
     }
-    
-    // Second pass: mark wrong positions
     for (let i = 0; i < 5; i++) {
       if (guessLetters[i] === null) continue;
-      
       const targetIndex = targetLetters.indexOf(guessLetters[i]);
       if (targetIndex !== -1) {
         evaluation[i] = 'wrong-position';
         targetLetters[targetIndex] = null;
       }
     }
-    
     return evaluation;
   };
 
   const handleNextWord = async () => {
-    setShowModal(false);
+    dispatch({ type: 'SET_SHOW_MODAL', showModal: false });
     await startNewGame();
   };
+
   const showGameEndModal = async (success, word) => {
-    setIsSuccess(success);
+    dispatch({ type: 'SET_IS_SUCCESS', isSuccess: success });
     try {
       const definition = await getWordDefinition(word);
-      setWordDefinition(definition);
+      dispatch({ type: 'SET_WORD_DEFINITION', wordDefinition: definition });
     } catch (error) {
       console.error('Error fetching word definition:', error);
-      setWordDefinition({
-        word: word,
-        definitions: [{ definition: 'Definition not available' }]
-      });
+      dispatch({ type: 'SET_WORD_DEFINITION', wordDefinition: { word, definitions: [{ definition: 'Definition not available' }] } });
     }
-    setShowModal(true);
+    dispatch({ type: 'SET_SHOW_MODAL', showModal: true });
   };
 
   const handleShowDefinition = async (word) => {
-    setDefinitionModalWord(word);
+    dispatch({ type: 'SET_DEFINITION_MODAL_WORD', definitionModalWord: word });
     try {
       const definition = await getWordDefinition(word);
-      setDefinitionModalDefinition(definition);
+      dispatch({ type: 'SET_DEFINITION_MODAL_DEFINITION', definitionModalDefinition: definition });
     } catch (error) {
       console.error('Error fetching definition:', error);
-      setDefinitionModalDefinition({
-        word: word,
-        definitions: [{ definition: 'Definition not available' }]
-      });
+      dispatch({ type: 'SET_DEFINITION_MODAL_DEFINITION', definitionModalDefinition: { word, definitions: [{ definition: 'Definition not available' }] } });
     }
-    setShowDefinitionModal(true);
+    dispatch({ type: 'SET_SHOW_DEFINITION_MODAL', showDefinitionModal: true });
   };
 
-  // Helper to reveal each letter in the row with a delay
   const revealRowLetters = (rowIndex) => {
     for (let i = 0; i < 5; i++) {
       setTimeout(() => {
-        setRevealedLetters(prev => {
-          const updated = prev.map(arr => [...arr]);
-          updated[rowIndex][i] = true;
-          return updated;
-        });
-      }, i * 200); // 200ms per tile
+        dispatch({ type: 'REVEAL_LETTER', rowIndex, letterIndex: i });
+      }, i * 200);
     }
   };
 
-  // Modify submitGuess to reveal letters one by one
   const submitGuess = async () => {
-    // First validate that the guess is a real word
-    const isValid = await isValidWord(currentGuess);
+    const isValid = await isValidWord(state.currentGuess);
     if (!isValid) {
       return;
     }
-
-    const evaluation = evaluateGuess(currentGuess, targetWord);
-
-    // Update evaluations
-    const newEvaluations = [...evaluations];
-    newEvaluations[currentRow] = evaluation;
-    setEvaluations(newEvaluations);
-
-    // Update guesses
-    const newGuesses = [...guesses];
-    newGuesses[currentRow] = currentGuess;
-    setGuesses(newGuesses);
-
-    // Reset revealedLetters for this row
-    setRevealedLetters(prev => {
-      const updated = prev.map(arr => [...arr]);
-      updated[currentRow] = Array(5).fill(false);
-      return updated;
-    });
-
-    // Reveal each letter with a delay
-    revealRowLetters(currentRow);
-
+    const evaluation = evaluateGuess(state.currentGuess, state.targetWord);
+    const newEvaluations = [...state.evaluations];
+    newEvaluations[state.currentRow] = evaluation;
+    dispatch({ type: 'SET_EVALUATIONS', evaluations: newEvaluations });
+    const newGuesses = [...state.guesses];
+    newGuesses[state.currentRow] = state.currentGuess;
+    dispatch({ type: 'SET_GUESSES', guesses: newGuesses });
+    // Always create a new revealedLetters array for the row
+    dispatch({ type: 'SET_REVEALED_LETTERS', revealedLetters: state.revealedLetters.map((arr, idx) => idx === state.currentRow ? Array(5).fill(false) : arr.slice()) });
+    revealRowLetters(state.currentRow);
     // Update letter states for keyboard
-    const newLetterStates = { ...letterStates };
-    for (let i = 0; i < currentGuess.length; i++) {
-      const letter = currentGuess[i];
+    const newLetterStates = { ...state.letterStates };
+    for (let i = 0; i < state.currentGuess.length; i++) {
+      const letter = state.currentGuess[i];
       const currentState = newLetterStates[letter];
       const newState = evaluation[i];
+      // Always allow 'incorrect' to overwrite previous state if not 'correct'
       if (currentState !== 'correct') {
-        if (newState === 'correct' || 
-           (newState === 'wrong-position' && currentState !== 'wrong-position') ||
-           (!currentState && newState === 'incorrect')) {
+        if (newState === 'correct' || (newState === 'wrong-position' && currentState !== 'wrong-position') || newState === 'incorrect') {
           newLetterStates[letter] = newState;
         }
       }
     }
-    setLetterStates(newLetterStates);
-
-    // Check if game is over
-    if (currentGuess === targetWord) {
+    dispatch({ type: 'SET_LETTER_STATES', letterStates: newLetterStates });
+    if (state.currentGuess === state.targetWord) {
       setTimeout(() => {
-        setGameOver(true);
-        setIsSuccess(true);
-        setCompletedWord(targetWord);
-        // Get definition for the modal
-        getWordDefinition(targetWord).then(def => {
-          setWordDefinition(def);
-          setShowModal(true);
+        dispatch({ type: 'SET_GAME_OVER', gameOver: true });
+        dispatch({ type: 'SET_IS_SUCCESS', isSuccess: true });
+        dispatch({ type: 'SET_COMPLETED_WORD', completedWord: state.targetWord });
+        getWordDefinition(state.targetWord).then(def => {
+          dispatch({ type: 'SET_WORD_DEFINITION', wordDefinition: def });
+          dispatch({ type: 'SET_SHOW_MODAL', showModal: true });
         }).catch(() => {});
-      }, 5 * 200 + 200); // Wait for all tiles to flip
-    } else if (currentRow === 5) {
+      }, 5 * 200 + 200);
+    } else if (state.currentRow === 5) {
       setTimeout(() => {
-        setGameOver(true);
-        setCompletedWord(targetWord);
-        getWordDefinition(targetWord).then(def => {
-          setWordDefinition(def);
-          setShowModal(true);
+        dispatch({ type: 'SET_GAME_OVER', gameOver: true });
+        dispatch({ type: 'SET_COMPLETED_WORD', completedWord: state.targetWord });
+        getWordDefinition(state.targetWord).then(def => {
+          dispatch({ type: 'SET_WORD_DEFINITION', wordDefinition: def });
+          dispatch({ type: 'SET_SHOW_MODAL', showModal: true });
         }).catch(() => {});
       }, 5 * 200 + 200);
     } else {
       setTimeout(() => {
-        setCurrentRow(currentRow + 1);
-        setCurrentGuess('');
+        dispatch({ type: 'SET_CURRENT_ROW', currentRow: state.currentRow + 1 });
+        dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: '' });
       }, 5 * 200 + 100);
     }
   };
 
   const showMessage = (msg) => {
-    setMessage(msg);
-    setTimeout(() => setMessage(''), 2000);
-  };  const getTileClass = (letter, index, rowIndex) => {
-    if (rowIndex > currentRow) return '';
+    dispatch({ type: 'SET_MESSAGE', message: msg });
+    setTimeout(() => dispatch({ type: 'SET_MESSAGE', message: '' }), 2000);
+  };
 
+  const getTileClass = (letter, index, rowIndex) => {
+    if (rowIndex > state.currentRow) return '';
     const classes = [];
-
-    // Add evaluation classes for submitted rows, but only if revealed
-    if (rowIndex < currentRow) {
-      const evaluation = evaluations[rowIndex];
-      if (evaluation && revealedLetters[rowIndex][index]) {
+    if (rowIndex < state.currentRow) {
+      const evaluation = state.evaluations[rowIndex];
+      if (evaluation && state.revealedLetters[rowIndex][index]) {
         classes.push(evaluation[index]);
-        classes.push('flip'); // Only flip when revealed
+        classes.push('flip');
       }
     }
-
-    // Handle correct guess case (current row, after evaluation, and revealed)
-    if (rowIndex === currentRow && evaluations[rowIndex] && revealedLetters[rowIndex][index]) {
-      classes.push(evaluations[rowIndex][index]);
-      classes.push('flip'); // Only flip when revealed
+    if (rowIndex === state.currentRow && state.evaluations[rowIndex] && state.revealedLetters[rowIndex][index]) {
+      classes.push(state.evaluations[rowIndex][index]);
+      classes.push('flip');
     }
-
-    // Add class for revealed answer row
-    if (rowIndex === revealedAnswerRow) {
+    if (rowIndex === state.revealedAnswerRow) {
       classes.push('revealed-answer');
     }
-
     return classes.join(' ');
   };
 
@@ -304,93 +320,77 @@ const Wordle = ({ onBackToMenu }) => {
   });
 
   const getClue = useCallback(async () => {
-    if (!targetWord) return;
+    if (!state.targetWord) return;
     try {
-      const def = await getWordDefinition(targetWord);
-      setClue(def.definitions[0]?.definition || 'No clue available');
-      setShowClue(true);
+      const def = await getWordDefinition(state.targetWord);
+      dispatch({ type: 'SET_CLUE', clue: def.definitions[0]?.definition || 'No clue available' });
+      dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
     } catch (e) {
-      setClue('No clue available');
-      setShowClue(true);
+      dispatch({ type: 'SET_CLUE', clue: 'No clue available' });
+      dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
     }
-  }, [targetWord]);
+  }, [state.targetWord]);
 
-  // Close menu when clicking outside
   useEffect(() => {
     const handleClick = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setMenuOpen(false);
+        dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
       }
     };
-    if (menuOpen) {
+    if (state.menuOpen) {
       document.addEventListener('mousedown', handleClick);
     } else {
       document.removeEventListener('mousedown', handleClick);
     }
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [menuOpen]);
+  }, [state.menuOpen]);
 
   const revealAnswer = async () => {
-    if (gameOver) return;
-    let revealRow = guesses.findIndex(g => g === '');
-    if (revealRow === -1) revealRow = guesses.length - 1;
-
-    setRevealedAnswerRow(revealRow); // Mark this row as the revealed answer row
-
-    const answer = targetWord;
-    const evaluation = evaluateGuess(answer, targetWord);
-    const newGuesses = [...guesses];
-    const newEvaluations = [...evaluations];
+    if (state.gameOver) return;
+    let revealRow = state.guesses.findIndex(g => g === '');
+    if (revealRow === -1) revealRow = state.guesses.length - 1;
+    dispatch({ type: 'SET_REVEALED_ANSWER_ROW', revealedAnswerRow: revealRow });
+    const answer = state.targetWord;
+    const evaluation = evaluateGuess(answer, state.targetWord);
+    const newGuesses = [...state.guesses];
+    const newEvaluations = [...state.evaluations];
     newGuesses[revealRow] = answer;
     newEvaluations[revealRow] = evaluation;
-    setGuesses(newGuesses);
-    setEvaluations(newEvaluations);
-    setCurrentGuess('');
-
-    // Reset revealedLetters for this row
-    setRevealedLetters(prev => {
-      const updated = prev.map(arr => [...arr]);
-      updated[revealRow] = Array(5).fill(false);
-      return updated;
-    });
-
-    // Reveal each letter with a delay
+    dispatch({ type: 'SET_GUESSES', guesses: newGuesses });
+    dispatch({ type: 'SET_EVALUATIONS', evaluations: newEvaluations });
+    dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: '' });
+    dispatch({ type: 'SET_REVEALED_LETTERS', revealedLetters: state.revealedLetters.map((arr, idx) => idx === revealRow ? Array(5).fill(false) : [...arr]) });
     revealRowLetters(revealRow);
-
-    // Update letter states for keyboard
-    const newLetterStates = { ...letterStates };
+    const newLetterStates = { ...state.letterStates };
     for (let i = 0; i < answer.length; i++) {
       const letter = answer[i];
       newLetterStates[letter] = evaluation[i];
     }
-    setLetterStates(newLetterStates);
-
-    // Show modal after animation
+    dispatch({ type: 'SET_LETTER_STATES', letterStates: newLetterStates });
     setTimeout(async () => {
-      setGameOver(true);
-      setIsSuccess(true);
-      setCompletedWord(targetWord);
+      dispatch({ type: 'SET_GAME_OVER', gameOver: true });
+      dispatch({ type: 'SET_IS_SUCCESS', isSuccess: true });
+      dispatch({ type: 'SET_COMPLETED_WORD', completedWord: state.targetWord });
       try {
-        const def = await getWordDefinition(targetWord);
-        setWordDefinition(def);
-        setShowModal(true);
+        const def = await getWordDefinition(state.targetWord);
+        dispatch({ type: 'SET_WORD_DEFINITION', wordDefinition: def });
+        dispatch({ type: 'SET_SHOW_MODAL', showModal: true });
       } catch (error) {
-        setShowModal(true);
+        dispatch({ type: 'SET_SHOW_MODAL', showModal: true });
       }
     }, 5 * 200 + 200);
-    setMenuOpen(false);
+    dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
   };
 
-  // Replace handleShowSuggestions to auto-pick and submit a suggestion
   const handleShowSuggestions = useCallback(async () => {
-    setIsLoading(true);
+    dispatch({ type: 'SET_IS_LOADING', isLoading: true });
     const correct = Array(5).fill(null);
     const wrongPosition = new Set();
-    const present = new Set(); // <-- Add this line
-    const absent = new Set();  // <-- Add this line
-    for (let row = 0; row < evaluations.length; row++) {
-      const evalRow = evaluations[row];
-      const guess = guesses[row] || '';
+    const present = new Set();
+    const absent = new Set();
+    for (let row = 0; row < state.evaluations.length; row++) {
+      const evalRow = state.evaluations[row];
+      const guess = state.guesses[row] || '';
       if (!evalRow) continue;
       for (let i = 0; i < 5; i++) {
         const letter = guess[i]?.toUpperCase();
@@ -403,54 +403,51 @@ const Wordle = ({ onBackToMenu }) => {
       }
     }
     const { getWordFinderSuggestions } = await import('../services/suggestionService');
-    const words = await getWordFinderSuggestions(correct, present, absent, targetWord, wrongPosition);
-    const availableWords = words.filter(word => !usedSuggestions.includes(word));
-    setIsLoading(false);
+    const words = await getWordFinderSuggestions(correct, present, absent, state.targetWord, wrongPosition);
+    const availableWords = words.filter(word => !state.usedSuggestions.includes(word));
+    dispatch({ type: 'SET_IS_LOADING', isLoading: false });
     if (availableWords.length > 0) {
       const newSuggestion = availableWords[Math.floor(Math.random() * availableWords.length)];
-      setUsedSuggestions([...usedSuggestions, newSuggestion]);
-      setCurrentGuess(newSuggestion);
-      setPendingSuggestion(true);
+      dispatch({ type: 'SET_USED_SUGGESTIONS', usedSuggestions: [...state.usedSuggestions, newSuggestion] });
+      dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: newSuggestion });
+      dispatch({ type: 'SET_PENDING_SUGGESTION', pendingSuggestion: true });
     } else {
-      // If no suggestions are found, fetch more words and try again
-      setIsLoading(true);
+      dispatch({ type: 'SET_IS_LOADING', isLoading: true });
       const newWords = await getDictionaryWords();
-      const newAvailableWords = newWords.filter(word => !usedSuggestions.includes(word));
-      setIsLoading(false);
+      const newAvailableWords = newWords.filter(word => !state.usedSuggestions.includes(word));
+      dispatch({ type: 'SET_IS_LOADING', isLoading: false });
       if (newAvailableWords.length > 0) {
         const newSuggestion = newAvailableWords[Math.floor(Math.random() * newAvailableWords.length)];
-        setUsedSuggestions([...usedSuggestions, newSuggestion]);
-        setCurrentGuess(newSuggestion);
-        setPendingSuggestion(true);
+        dispatch({ type: 'SET_USED_SUGGESTIONS', usedSuggestions: [...state.usedSuggestions, newSuggestion] });
+        dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: newSuggestion });
+        dispatch({ type: 'SET_PENDING_SUGGESTION', pendingSuggestion: true });
       } else {
         showMessage('No new suggestions found');
       }
     }
-  }, [evaluations, guesses]);
+  }, [state.evaluations, state.guesses, state.usedSuggestions, state.targetWord]);
 
-  // Effect to auto-submit after suggestion is set
   useEffect(() => {
-    if (pendingSuggestion && currentGuess.length === 5) {
-      setPendingSuggestion(false);
+    if (state.pendingSuggestion && state.currentGuess.length === 5) {
+      dispatch({ type: 'SET_PENDING_SUGGESTION', pendingSuggestion: false });
       submitGuess();
     }
-  }, [pendingSuggestion, currentGuess]);
+    // eslint-disable-next-line
+  }, [state.pendingSuggestion, state.currentGuess]);
 
-  // Compute absent letters: guessed but not in targetWord
   const absentLetters = Array.from(new Set(
-    guesses
+    state.guesses
       .join('')
       .split('')
-      .filter(l => l && !targetWord.includes(l))
+      .filter(l => l && !state.targetWord.includes(l))
   ));
 
-  // Keyboard shortcuts for menu options
   useEffect(() => {
     const handleMenuShortcuts = (e) => {
       if (e.altKey && e.shiftKey && !e.ctrlKey) {
         if (e.key.toLowerCase() === 'c') {
           e.preventDefault();
-          if (!showClue) getClue();
+          if (!state.showClue) getClue();
         } else if (e.key.toLowerCase() === 's') {
           e.preventDefault();
           handleShowSuggestions();
@@ -465,15 +462,14 @@ const Wordle = ({ onBackToMenu }) => {
     };
     window.addEventListener('keydown', handleMenuShortcuts);
     return () => window.removeEventListener('keydown', handleMenuShortcuts);
-  }, [showClue, getClue, handleShowSuggestions]);
+  }, [state.showClue, getClue, handleShowSuggestions]);
 
   return (
-    <div className={`wordle ${isContrastMode ? 'contrast' : ''}`}>
-      {/* Visually hidden input for accessibility and to ensure input is always captured */}
+    <div className={`wordle ${state.isContrastMode ? 'contrast' : ''}`}>
       <input
         ref={inputRef}
         type="text"
-        value={currentGuess}
+        value={state.currentGuess}
         maxLength={5}
         autoFocus
         style={{
@@ -485,8 +481,8 @@ const Wordle = ({ onBackToMenu }) => {
         }}
         tabIndex={-1}
         aria-label="Wordle guess input"
+        readOnly
       />
-
       <div className="game-header">
         <div className="header-content">
           <h1>
@@ -494,7 +490,7 @@ const Wordle = ({ onBackToMenu }) => {
           </h1>
         </div>
         <div className="header-actions">
-          <button onClick={getClue} className="header-icon-btn" disabled={showClue} title="Get Clue (Alt+Shift+C)" aria-label="Get Clue">
+          <button onClick={getClue} className="header-icon-btn" disabled={state.showClue} title="Get Clue (Alt+Shift+C)" aria-label="Get Clue">
             <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor">
               <path d="M0 0h24v24H0V0z" fill="none"/>
               <path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/>
@@ -509,41 +505,38 @@ const Wordle = ({ onBackToMenu }) => {
             <button
               className="burger-menu-btn"
               aria-label="Open menu"
-              onClick={() => setMenuOpen((open) => !open)}
+              onClick={() => dispatch({ type: 'SET_MENU_OPEN', menuOpen: !state.menuOpen })}
             >
               <span className="burger-bar"></span>
               <span className="burger-bar"></span>
               <span className="burger-bar"></span>
             </button>
-            {menuOpen && (
+            {state.menuOpen && (
               <div className="burger-dropdown" ref={menuRef}>
-                <button onClick={() => { startNewGame(); setMenuOpen(false); }} className="dropdown-item">New Game</button>
-                <button onClick={() => { revealAnswer(); setMenuOpen(false); }} className="dropdown-item">Reveal</button>
-                <button onClick={() => setIsContrastMode(!isContrastMode)} className="dropdown-item">Contrast Mode</button>
+                <button onClick={() => { startNewGame(); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">New Game</button>
+                <button onClick={() => { revealAnswer(); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">Reveal</button>
+                <button onClick={() => dispatch({ type: 'SET_IS_CONTRAST_MODE', isContrastMode: !state.isContrastMode })} className="dropdown-item">Contrast Mode</button>
               </div>
             )}
           </div>
         </div>
       </div>
-
-      {/* Move the message above the game-container and add a higher z-index/style for visibility */}
-      {message && (
+      {state.message && (
         <div className="message" style={{ position: 'relative', zIndex: 10, margin: '12px 0', fontWeight: 'bold', color: '#b91c1c', background: '#fffbe6', border: '1px solid #fbbf24', borderRadius: 6, padding: '8px 16px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
-          {message}
+          {state.message}
         </div>
       )}
-      {isLoading && <div className="loading">Loading words...</div>}
-
+      {state.isLoading && <div className="loading">Loading words...</div>}
       <div className="game-container">
         <div className="wordle-grid">
-          {guesses.map((guess, rowIndex) => (
+          {state.guesses.map((guess, rowIndex) => (
             <div key={rowIndex} className="wordle-row">
-              {rowIndex < currentRow && guesses[rowIndex] && (
+              {rowIndex < state.currentRow && state.guesses[rowIndex] && (
                 <button
                   className="definition-icon-btn"
-                  onClick={() => handleShowDefinition(guesses[rowIndex])}
-                  title={`View definition of ${guesses[rowIndex]}`}
-                  aria-label={`View definition of ${guesses[rowIndex]}`}
+                  onClick={() => handleShowDefinition(state.guesses[rowIndex])}
+                  title={`View definition of ${state.guesses[rowIndex]}`}
+                  aria-label={`View definition of ${state.guesses[rowIndex]}`}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" height="30px" viewBox="0 0 24 24" width="30px" fill="currentColor">
                     <path d="M0 0h24v24H0V0z" fill="none"/>
@@ -554,20 +547,19 @@ const Wordle = ({ onBackToMenu }) => {
               {Array.from({ length: 5 }, (_, index) => (
                 <div
                   key={index}
-                  className={`wordle-tile ${getTileClass(guess[index], index, rowIndex)}${rowIndex === currentRow && invalidGuess ? ' invalid' : ''}`}
+                  className={`wordle-tile ${getTileClass(guess[index], index, rowIndex)}${rowIndex === state.currentRow && state.invalidGuess ? ' invalid' : ''}`}
                   style={getFlipDelay(index)}
                 >
-                  {/* Show the correct answer letters in white for the revealed answer row, regardless of animation */}
-                  {rowIndex === revealedAnswerRow ? targetWord[index] : (rowIndex === currentRow ? currentGuess[index] || '' : guesses[rowIndex][index] || '')}
-                  {isContrastMode && evaluations[rowIndex] && revealedLetters[rowIndex][index] && (
+                  {rowIndex === state.revealedAnswerRow ? state.targetWord[index] : (rowIndex === state.currentRow ? state.currentGuess[index] || '' : state.guesses[rowIndex][index] || '')}
+                  {state.isContrastMode && state.evaluations[rowIndex] && state.revealedLetters[rowIndex][index] && (
                     <div className="contrast-icon">
-                      {evaluations[rowIndex][index] === 'correct' && (
+                      {state.evaluations[rowIndex][index] === 'correct' && (
                         <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
                           <path d="M0 0h24v24H0V0z" fill="none"/>
                           <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
                         </svg>
                       )}
-                      {evaluations[rowIndex][index] === 'wrong-position' && (
+                      {state.evaluations[rowIndex][index] === 'wrong-position' && (
                         <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
                           <path d="M0 0h24v24H0V0z" fill="none"/>
                           <path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/>
@@ -581,19 +573,18 @@ const Wordle = ({ onBackToMenu }) => {
             </div>
           ))}
         </div>
-        {showClue && clue && (
+        {state.showClue && state.clue && (
           <div className="clue-text" style={{marginBottom: 8, color: '#1a73e8', fontStyle: 'italic'}}>
-            Clue: {clue}
+            Clue: {state.clue}
           </div>
         )}
         <div className="keyboard">
           {[
-            'QWERTYUIOP', // 10 keys: Q W E R T Y U I O P
-            'ASDFGHJKL', // 9 keys: A S D F G H J K L
-            'ZXCVBNM',     // 7 keys: Z X C V B N M
+            'QWERTYUIOP',
+            'ASDFGHJKL',
+            'ZXCVBNM',
           ].map((row, i) => (
             <div key={i} className="keyboard-row">
-              {/* Place ENTER and BACKSPACE on the last row */}
               {i === 2 && (
                 <button 
                   className="key" 
@@ -606,20 +597,20 @@ const Wordle = ({ onBackToMenu }) => {
               {row.split('').map(key => (
                 <button
                   key={key}
-                  className={`key ${letterStates[key] || ''}`}
+                  className={`key ${state.letterStates[key] || ''}`}
                   onClick={() => handleKeyPress(key)}
                   data-key={key}
                 >
                   {key}
-                  {isContrastMode && letterStates[key] && (
+                  {state.isContrastMode && state.letterStates[key] && (
                     <div className="contrast-icon">
-                      {letterStates[key] === 'correct' && (
+                      {state.letterStates[key] === 'correct' && (
                         <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
                           <path d="M0 0h24v24H0V0z" fill="none"/>
                           <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
                         </svg>
                       )}
-                      {letterStates[key] === 'wrong-position' && (
+                      {state.letterStates[key] === 'wrong-position' && (
                         <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
                           <path d="M0 0h24v24H0V0z" fill="none"/>
                           <path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/>
@@ -641,20 +632,20 @@ const Wordle = ({ onBackToMenu }) => {
             </div>
           ))}
         </div>
-      </div>      <WordModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        word={completedWord}
-        definition={wordDefinition}
-        isSuccess={isSuccess}
+      </div>
+      <WordModal
+        isOpen={state.showModal}
+        onClose={() => dispatch({ type: 'SET_SHOW_MODAL', showModal: false })}
+        word={state.completedWord}
+        definition={state.wordDefinition}
+        isSuccess={state.isSuccess}
         onNextWord={handleNextWord}
       />
-
       <DefinitionModal
-        isOpen={showDefinitionModal}
-        onClose={() => setShowDefinitionModal(false)}
-        word={definitionModalWord}
-        definition={definitionModalDefinition}
+        isOpen={state.showDefinitionModal}
+        onClose={() => dispatch({ type: 'SET_SHOW_DEFINITION_MODAL', showDefinitionModal: false })}
+        word={state.definitionModalWord}
+        definition={state.definitionModalDefinition}
       />
     </div>
   );
