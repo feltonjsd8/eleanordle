@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/eleanordle/static/css/main.af021f13.css",
-    "main.js": "/eleanordle/static/js/main.549aec85.js",
+    "main.js": "/eleanordle/static/js/main.710f909f.js",
     "index.html": "/eleanordle/index.html",
     "main.af021f13.css.map": "/eleanordle/static/css/main.af021f13.css.map",
-    "main.549aec85.js.map": "/eleanordle/static/js/main.549aec85.js.map"
+    "main.710f909f.js.map": "/eleanordle/static/js/main.710f909f.js.map"
   },
   "entrypoints": [
     "static/css/main.af021f13.css",
-    "static/js/main.549aec85.js"
+    "static/js/main.710f909f.js"
   ]
 }
