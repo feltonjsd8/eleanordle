@@ -263,10 +263,16 @@ const Wordle = ({ onBackToMenu }) => {
       const letter = state.currentGuess[i];
       const currentState = newLetterStates[letter];
       const newState = evaluation[i];
-      // Always allow 'incorrect' to overwrite previous state if not 'correct'
-      if (currentState !== 'correct') {
-        if (newState === 'correct' || (newState === 'wrong-position' && currentState !== 'wrong-position') || newState === 'incorrect') {
-          newLetterStates[letter] = newState;
+      // Only upgrade state, never downgrade
+      if (newState === 'correct') {
+        newLetterStates[letter] = 'correct';
+      } else if (newState === 'wrong-position') {
+        if (currentState !== 'correct' && currentState !== 'wrong-position') {
+          newLetterStates[letter] = 'wrong-position';
+        }
+      } else if (newState === 'incorrect') {
+        if (!currentState) {
+          newLetterStates[letter] = 'incorrect';
         }
       }
     }
