@@ -32,20 +32,34 @@ const initialState = {
   usedSuggestions: [],
   isContrastMode: false,
   alwaysShowClue: false,
+  streak: 0,
+  score: 6,
+  totalScore: 0,
 };
 
 function reducer(state, action) {
   switch (action.type) {
     case 'RESET': {
-      // Preserve alwaysShowClue, and if true, keep showClue true (clue will be updated after fetch)
       const alwaysShowClue = state.alwaysShowClue;
+      const resetStreak = action.resetStreak;
       return {
         ...initialState,
         targetWord: action.targetWord,
         alwaysShowClue,
         showClue: alwaysShowClue ? true : false,
+        streak: resetStreak ? 0 : (action.keepStreak ? state.streak : 0),
+        totalScore: resetStreak ? 0 : state.totalScore,
+        score: 6,
       };
     }
+    case 'DECREMENT_SCORE':
+      return { ...state, score: Math.max(0, state.score - 1) };
+    case 'INCREMENT_STREAK':
+      return { ...state, streak: state.streak + 1 };
+    case 'RESET_STREAK':
+      return { ...state, streak: 0 };
+    case 'ADD_TO_TOTAL_SCORE':
+      return { ...state, totalScore: state.totalScore + state.score };
     case 'SET_GUESSES':
       return { ...state, guesses: action.guesses };
     case 'SET_CURRENT_GUESS':
@@ -121,11 +135,11 @@ const Wordle = ({ onBackToMenu }) => {
   // Cache for word definitions to avoid unnecessary API calls
   const definitionCache = useRef({});
 
-  const startNewGame = async () => {
+  const startNewGame = async (resetStreak = false) => {
     dispatch({ type: 'SET_IS_LOADING', isLoading: true });
     try {
       const newWord = await getRandomWord();
-      dispatch({ type: 'RESET', targetWord: newWord });
+      dispatch({ type: 'RESET', targetWord: newWord, keepStreak: !resetStreak, resetStreak });
       // Show clue immediately if alwaysShowClue is enabled
       if (state.alwaysShowClue) {
         try {
@@ -223,7 +237,8 @@ const Wordle = ({ onBackToMenu }) => {
 
   const handleNextWord = async () => {
     dispatch({ type: 'SET_SHOW_MODAL', showModal: false });
-    await startNewGame();
+    // Only reset streak/score if last game was a loss (not success)
+    await startNewGame(!state.isSuccess);
   };
 
   const showGameEndModal = async (success, word) => {
@@ -269,6 +284,7 @@ const Wordle = ({ onBackToMenu }) => {
     if (!isValid) {
       return;
     }
+    dispatch({ type: 'DECREMENT_SCORE' });
     const evaluation = evaluateGuess(state.currentGuess, state.targetWord);
     const newEvaluations = [...state.evaluations];
     newEvaluations[state.currentRow] = evaluation;
@@ -315,6 +331,8 @@ const Wordle = ({ onBackToMenu }) => {
         dispatch({ type: 'SET_GAME_OVER', gameOver: true });
         dispatch({ type: 'SET_IS_SUCCESS', isSuccess: true });
         dispatch({ type: 'SET_COMPLETED_WORD', completedWord: state.targetWord });
+        dispatch({ type: 'INCREMENT_STREAK' });
+        dispatch({ type: 'ADD_TO_TOTAL_SCORE' });
         getWordDefinition(state.targetWord).then(def => {
           dispatch({ type: 'SET_WORD_DEFINITION', wordDefinition: def });
           dispatch({ type: 'SET_SHOW_MODAL', showModal: true });
@@ -324,6 +342,7 @@ const Wordle = ({ onBackToMenu }) => {
       setTimeout(() => {
         dispatch({ type: 'SET_GAME_OVER', gameOver: true });
         dispatch({ type: 'SET_COMPLETED_WORD', completedWord: state.targetWord });
+        dispatch({ type: 'RESET_STREAK' });
         getWordDefinition(state.targetWord).then(def => {
           dispatch({ type: 'SET_WORD_DEFINITION', wordDefinition: def });
           dispatch({ type: 'SET_SHOW_MODAL', showModal: true });
@@ -553,6 +572,10 @@ const Wordle = ({ onBackToMenu }) => {
       />
       <div className="game-header">
         <div className="header-content">
+          <div style={{ position: 'absolute', left: 12, top: 12, textAlign: 'left', fontWeight: 600, fontSize: 16, color: '#333' }}>
+            <div>Streak: {state.streak}</div>
+            <div>Score: {state.totalScore}</div>
+          </div>
           <h1>
             <span className="title-highlight">Eleanor</span>dle
           </h1>
@@ -581,7 +604,7 @@ const Wordle = ({ onBackToMenu }) => {
             </button>
             {state.menuOpen && (
               <div className="burger-dropdown" ref={menuRef}>
-                <button onClick={() => { startNewGame(); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">New Game</button>
+                <button onClick={() => { startNewGame(true); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">New Game</button>
                 <button onClick={() => { revealAnswer(); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">Reveal</button>
                 <button onClick={() => dispatch({ type: 'SET_IS_CONTRAST_MODE', isContrastMode: !state.isContrastMode })} className="dropdown-item">Contrast Mode</button>
                 <button onClick={() => dispatch({ type: 'SET_ALWAYS_SHOW_CLUE', alwaysShowClue: !state.alwaysShowClue })} className="dropdown-item">
