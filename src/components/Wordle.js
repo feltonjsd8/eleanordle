@@ -31,12 +31,21 @@ const initialState = {
   pendingSuggestion: false,
   usedSuggestions: [],
   isContrastMode: false,
+  alwaysShowClue: false,
 };
 
 function reducer(state, action) {
   switch (action.type) {
-    case 'RESET':
-      return { ...initialState, targetWord: action.targetWord };
+    case 'RESET': {
+      // Preserve alwaysShowClue, and if true, keep showClue true (clue will be updated after fetch)
+      const alwaysShowClue = state.alwaysShowClue;
+      return {
+        ...initialState,
+        targetWord: action.targetWord,
+        alwaysShowClue,
+        showClue: alwaysShowClue ? true : false,
+      };
+    }
     case 'SET_GUESSES':
       return { ...state, guesses: action.guesses };
     case 'SET_CURRENT_GUESS':
@@ -87,6 +96,8 @@ function reducer(state, action) {
       return { ...state, isContrastMode: action.isContrastMode };
     case 'SET_TARGET_WORD':
       return { ...state, targetWord: action.targetWord };
+    case 'SET_ALWAYS_SHOW_CLUE':
+      return { ...state, alwaysShowClue: action.alwaysShowClue };
     case 'REVEAL_LETTER': {
       // Reveal a single letter in a row
       const { rowIndex, letterIndex } = action;
@@ -115,6 +126,17 @@ const Wordle = ({ onBackToMenu }) => {
     try {
       const newWord = await getRandomWord();
       dispatch({ type: 'RESET', targetWord: newWord });
+      // Show clue immediately if alwaysShowClue is enabled
+      if (state.alwaysShowClue) {
+        try {
+          const def = await getWordDefinition(newWord);
+          dispatch({ type: 'SET_CLUE', clue: def.definitions[0]?.definition || 'No clue available' });
+          dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
+        } catch (e) {
+          dispatch({ type: 'SET_CLUE', clue: 'No clue available' });
+          dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
+        }
+      }
     } catch (error) {
       console.error('Error selecting word:', error);
       showMessage('Error loading word. Please try again.');
@@ -489,6 +511,27 @@ const Wordle = ({ onBackToMenu }) => {
     return () => window.removeEventListener('keydown', handleMenuShortcuts);
   }, [state.showClue, getClue, handleShowSuggestions]);
 
+  // Persist alwaysShowClue in localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('alwaysShowClue');
+    if (stored !== null) {
+      dispatch({ type: 'SET_ALWAYS_SHOW_CLUE', alwaysShowClue: stored === 'true' });
+    }
+    // eslint-disable-next-line
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('alwaysShowClue', state.alwaysShowClue);
+  }, [state.alwaysShowClue]);
+
+  useEffect(() => {
+    if (state.alwaysShowClue && state.targetWord) {
+      getClue();
+    }
+    // Only run when alwaysShowClue is toggled on
+    // eslint-disable-next-line
+  }, [state.alwaysShowClue]);
+
   return (
     <div className={`wordle ${state.isContrastMode ? 'contrast' : ''}`}>
       <input
@@ -541,6 +584,9 @@ const Wordle = ({ onBackToMenu }) => {
                 <button onClick={() => { startNewGame(); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">New Game</button>
                 <button onClick={() => { revealAnswer(); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">Reveal</button>
                 <button onClick={() => dispatch({ type: 'SET_IS_CONTRAST_MODE', isContrastMode: !state.isContrastMode })} className="dropdown-item">Contrast Mode</button>
+                <button onClick={() => dispatch({ type: 'SET_ALWAYS_SHOW_CLUE', alwaysShowClue: !state.alwaysShowClue })} className="dropdown-item">
+                  {state.alwaysShowClue ? 'Hide Clue at Start' : 'Always Show Clue at Start'}
+                </button>
               </div>
             )}
           </div>
