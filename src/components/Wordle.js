@@ -551,6 +551,67 @@ const Wordle = ({ onBackToMenu }) => {
     // eslint-disable-next-line
   }, [state.alwaysShowClue]);
 
+  // Speech recognition for microphone input
+  const recognizingRef = useRef(false);
+  const recognitionRef = useRef(null);
+
+  const handleMicInput = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showMessage('Speech recognition not supported in this browser.');
+      return;
+    }
+    if (recognizingRef.current) {
+      recognitionRef.current && recognitionRef.current.stop();
+      recognizingRef.current = false;
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    let timeoutId;
+    recognition.onstart = () => {
+      recognizingRef.current = true;
+      showMessage('Listening...');
+      // Stop after 7 seconds if no speech
+      timeoutId = setTimeout(() => {
+        if (recognizingRef.current) {
+          recognition.stop();
+          showMessage('No speech detected.');
+        }
+      }, 7000);
+    };
+    recognition.onerror = (event) => {
+      recognizingRef.current = false;
+      clearTimeout(timeoutId);
+      let errMsg = 'Speech recognition error.';
+      if (event && event.error) {
+        if (event.error === 'not-allowed') errMsg = 'Microphone access denied.';
+        else if (event.error === 'no-speech') errMsg = 'No speech detected.';
+        else if (event.error === 'audio-capture') errMsg = 'No microphone found.';
+        else errMsg = `Speech recognition error: ${event.error}`;
+      }
+      showMessage(errMsg);
+    };
+    recognition.onend = () => {
+      recognizingRef.current = false;
+      clearTimeout(timeoutId);
+    };
+    recognition.onresult = (event) => {
+      recognizingRef.current = false;
+      clearTimeout(timeoutId);
+      const transcript = event.results[0][0].transcript.trim().toUpperCase().replace(/[^A-Z]/g, '');
+      if (transcript.length !== 5) {
+        showMessage('Please say a 5-letter word.');
+        return;
+      }
+      dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: transcript });
+    };
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
   return (
     <div className={`wordle ${state.isContrastMode ? 'contrast' : ''}`}>
       <input
@@ -587,9 +648,26 @@ const Wordle = ({ onBackToMenu }) => {
               <path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/>
             </svg>
           </button>
-          <button onClick={handleShowSuggestions} className="header-icon-btn" title="Suggest Word (Alt+Shift+S)" aria-label="Suggest Word">
+          <button
+            onClick={handleShowSuggestions}
+            className="header-icon-btn"
+            title="Suggest Word (Alt+Shift+S)"
+            aria-label="Suggest Word"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor">
-              <path d="M0 0h24v24H0V0z" fill="none"/><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+              <path d="M0 0h24v24H0V0z" fill="none"/>
+              <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+          </button>
+          <button
+            onClick={handleMicInput}
+            className="header-icon-btn"
+            title="Speak Word (Microphone)"
+            aria-label="Speak Word"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor">
+              <path d="M0 0h24v24H0V0z" fill="none"/>
+              <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3s-3 1.34-3 3v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.07 2.13 5.64 5 6.32V21h2v-2.68c2.87-.68 5-3.25 5-6.32h-2z"/>
             </svg>
           </button>
           <div className="burger-menu-anchor">
