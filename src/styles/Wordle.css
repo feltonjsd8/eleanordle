@@ -462,3 +462,28 @@
   height: 100%;
   fill: currentColor;
 }
+
+.score-streak-container {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.streak-display, .score-display {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  font-size: 16px;
+  color: #333;
+}
+
+.streak-display svg, .score-display svg {
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+  fill: currentColor;
+}
