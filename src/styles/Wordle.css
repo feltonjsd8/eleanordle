@@ -137,10 +137,16 @@
 
 .wordle-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, 1fr) 30px; /* 5 columns for letters, 1 fixed-width column for score */
   gap: 5px;
   position: relative;
   padding-left: 30px; /* Space for the icon */
+  align-items: center; /* Vertically align items in the row */
+}
+
+.row-score {
+  justify-self: center; /* Center the score within its grid cell */
+  /* Removed padding-right as spacing is now handled by grid column width */
 }
 
 .wordle-tile {

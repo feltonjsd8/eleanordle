@@ -33,8 +33,9 @@ const initialState = {
   isContrastMode: false,
   alwaysShowClue: true,
   streak: 0,
-  score: 6,
+  score: 50,
   totalScore: 0,
+  rowScores: Array(6).fill(null),
 };
 
 function reducer(state, action) {
@@ -49,11 +50,11 @@ function reducer(state, action) {
         showClue: alwaysShowClue ? true : false,
         streak: resetStreak ? 0 : (action.keepStreak ? state.streak : 0),
         totalScore: resetStreak ? 0 : state.totalScore,
-        score: 6,
+        score: 50,
       };
     }
     case 'DECREMENT_SCORE':
-      return { ...state, score: Math.max(0, state.score - 1) };
+      return { ...state, score: Math.max(0, state.score - action.amount) };
     case 'INCREMENT_STREAK':
       return { ...state, streak: state.streak + 1 };
     case 'RESET_STREAK':
@@ -112,6 +113,8 @@ function reducer(state, action) {
       return { ...state, targetWord: action.targetWord };
     case 'SET_ALWAYS_SHOW_CLUE':
       return { ...state, alwaysShowClue: action.alwaysShowClue };
+    case 'SET_ROW_SCORES':
+      return { ...state, rowScores: action.rowScores };
     case 'REVEAL_LETTER': {
       // Reveal a single letter in a row
       const { rowIndex, letterIndex } = action;
@@ -281,8 +284,29 @@ const Wordle = ({ onBackToMenu }) => {
     if (!isValid) {
       return;
     }
-    dispatch({ type: 'DECREMENT_SCORE' });
     const evaluation = evaluateGuess(state.currentGuess, state.targetWord);
+    const newRowScores = [...state.rowScores];
+    let score_reduction = 0;
+    const newLetterStates = { ...state.letterStates }; // Get current letter states
+
+    for (let i = 0; i < evaluation.length; i++) {
+      const letter = state.currentGuess[i];
+      const currentOverallState = newLetterStates[letter]; // Get the overall state of the letter
+
+      if (evaluation[i] === 'correct') {
+        score_reduction += 4;
+      } else if (evaluation[i] === 'wrong-position') {
+        score_reduction += 2;
+      } else if (evaluation[i] === 'incorrect') {
+        // Only reduce score if the letter is not already known to be correct or wrong-position
+        if (currentOverallState !== 'correct' && currentOverallState !== 'wrong-position') {
+          score_reduction += 1;
+        }
+      }
+    }
+    newRowScores[state.currentRow] = state.score - score_reduction;
+    dispatch({ type: 'SET_ROW_SCORES', rowScores: newRowScores });
+    dispatch({ type: 'DECREMENT_SCORE', amount: score_reduction });
     const newEvaluations = [...state.evaluations];
     newEvaluations[state.currentRow] = evaluation;
     dispatch({ type: 'SET_EVALUATIONS', evaluations: newEvaluations });
@@ -293,7 +317,6 @@ const Wordle = ({ onBackToMenu }) => {
     dispatch({ type: 'SET_REVEALED_LETTERS', revealedLetters: state.revealedLetters.map((arr, idx) => idx === state.currentRow ? Array(5).fill(false) : arr.slice()) });
     revealRowLetters(state.currentRow);
     // Update letter states for keyboard
-    const newLetterStates = { ...state.letterStates };
     for (let i = 0; i < state.currentGuess.length; i++) {
       const letter = state.currentGuess[i];
       const currentState = newLetterStates[letter];
@@ -743,6 +766,11 @@ const Wordle = ({ onBackToMenu }) => {
                     
                   </div>
                 ))}
+                {state.rowScores[rowIndex] !== null && (
+                  <div className="row-score" style={{ marginLeft: '10px', fontSize: '20px', fontWeight: 'bold' }}>
+                    {state.rowScores[rowIndex]}
+                  </div>
+                )}
               </div>
             );
           })}
