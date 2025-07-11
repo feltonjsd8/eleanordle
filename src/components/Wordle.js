@@ -34,9 +34,10 @@ const initialState = {
   alwaysShowClue: true,
   streak: 0,
   score: 50,
-  totalScore: 0,
-  rowScores: Array(6).fill(null),
-};
+          totalScore: 0,
+          rowScores: Array(6).fill(null),
+          wrongPositionHistory: {},
+        };;
 
 function reducer(state, action) {
   switch (action.type) {
@@ -288,10 +289,9 @@ const Wordle = ({ onBackToMenu }) => {
     const newRowScores = [...state.rowScores];
     let score_reduction = 0;
     const newLetterStates = { ...state.letterStates }; // Get current letter states
+    const newWrongPositionHistory = JSON.parse(JSON.stringify(state.wrongPositionHistory || {}));
 
     if (state.currentGuess !== state.targetWord) {
-      const letterScores = {}; // Store the best score for each letter in the guess
-
       for (let i = 0; i < evaluation.length; i++) {
         const letter = state.currentGuess[i];
         const currentOverallState = newLetterStates[letter];
@@ -302,27 +302,26 @@ const Wordle = ({ onBackToMenu }) => {
             score = 5;
           }
         } else if (evaluation[i] === 'wrong-position') {
-          if (currentOverallState !== 'correct' && currentOverallState !== 'wrong-position') {
+          const history = newWrongPositionHistory[letter] || [];
+          if (!history.includes(i)) {
             score = 3;
+            if (!newWrongPositionHistory[letter]) {
+              newWrongPositionHistory[letter] = [];
+            }
+            newWrongPositionHistory[letter].push(i);
           }
         } else if (evaluation[i] === 'incorrect') {
           if (currentOverallState !== 'correct' && currentOverallState !== 'wrong-position' && currentOverallState !== 'incorrect') {
             score = 1;
           }
         }
-
-        if (!letterScores[letter] || score > letterScores[letter]) {
-          letterScores[letter] = score;
-        }
-      }
-
-      for (const letter in letterScores) {
-        score_reduction += letterScores[letter];
+        score_reduction += score;
       }
     }
     newRowScores[state.currentRow] = state.score - score_reduction;
     dispatch({ type: 'SET_ROW_SCORES', rowScores: newRowScores });
     dispatch({ type: 'DECREMENT_SCORE', amount: score_reduction });
+    dispatch({ type: 'SET_WRONG_POSITION_HISTORY', wrongPositionHistory: newWrongPositionHistory });
     const newEvaluations = [...state.evaluations];
     newEvaluations[state.currentRow] = evaluation;
     dispatch({ type: 'SET_EVALUATIONS', evaluations: newEvaluations });
