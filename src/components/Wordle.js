@@ -289,19 +289,35 @@ const Wordle = ({ onBackToMenu }) => {
     let score_reduction = 0;
     const newLetterStates = { ...state.letterStates }; // Get current letter states
 
-    for (let i = 0; i < evaluation.length; i++) {
-      const letter = state.currentGuess[i];
-      const currentOverallState = newLetterStates[letter]; // Get the overall state of the letter
+    if (state.currentGuess !== state.targetWord) {
+      const letterScores = {}; // Store the best score for each letter in the guess
 
-      if (evaluation[i] === 'correct') {
-        score_reduction += 4;
-      } else if (evaluation[i] === 'wrong-position') {
-        score_reduction += 2;
-      } else if (evaluation[i] === 'incorrect') {
-        // Only reduce score if the letter is not already known to be correct or wrong-position
-        if (currentOverallState !== 'correct' && currentOverallState !== 'wrong-position') {
-          score_reduction += 1;
+      for (let i = 0; i < evaluation.length; i++) {
+        const letter = state.currentGuess[i];
+        const currentOverallState = newLetterStates[letter];
+        let score = 0;
+
+        if (evaluation[i] === 'correct') {
+          if (currentOverallState !== 'correct') {
+            score = 5;
+          }
+        } else if (evaluation[i] === 'wrong-position') {
+          if (currentOverallState !== 'correct' && currentOverallState !== 'wrong-position') {
+            score = 3;
+          }
+        } else if (evaluation[i] === 'incorrect') {
+          if (currentOverallState !== 'correct' && currentOverallState !== 'wrong-position' && currentOverallState !== 'incorrect') {
+            score = 1;
+          }
         }
+
+        if (!letterScores[letter] || score > letterScores[letter]) {
+          letterScores[letter] = score;
+        }
+      }
+
+      for (const letter in letterScores) {
+        score_reduction += letterScores[letter];
       }
     }
     newRowScores[state.currentRow] = state.score - score_reduction;
