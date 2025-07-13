@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px;
+  padding: 10px;
   min-height: 100vh;
   background-color: #f8f9fa;
 }
@@ -146,7 +146,9 @@
 
 .row-score {
   justify-self: center; /* Center the score within its grid cell */
-  /* Removed padding-right as spacing is now handled by grid column width */
+  margin-left: 2px;
+  font-size: 14px;
+  font-weight: bold;
 }
 
 .wordle-tile {
@@ -488,7 +490,7 @@
   display: flex;
   align-items: center;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 14px;
   color: #333;
 }
 

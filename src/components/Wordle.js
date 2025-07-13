@@ -782,7 +782,7 @@ const Wordle = ({ onBackToMenu }) => {
                   </div>
                 ))}
                 {state.rowScores[rowIndex] !== null && (
-                  <div className="row-score" style={{ marginLeft: '10px', fontSize: '20px', fontWeight: 'bold' }}>
+                  <div className="row-score">
                     {state.rowScores[rowIndex]}
                   </div>
                 )}
