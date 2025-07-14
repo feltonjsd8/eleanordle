@@ -145,7 +145,11 @@ const Wordle = ({ onBackToMenu }) => {
   // Cache for word definitions to avoid unnecessary API calls
   const definitionCache = useRef({});
 
-  const startNewGame = async (resetStreak = false) => {
+  const startNewGame = async (resetStreak = false, animate = false) => {
+    if (animate) {
+      dispatch({ type: 'SET_ANIMATE_SCORE', animateScore: true });
+      dispatch({ type: 'SET_ANIMATE_STREAK', animateStreak: true });
+    }
     dispatch({ type: 'SET_IS_LOADING', isLoading: true });
     try {
       const newWord = await getRandomWord();
@@ -167,7 +171,7 @@ const Wordle = ({ onBackToMenu }) => {
   };
 
   useEffect(() => {
-    startNewGame();
+    startNewGame(false, false);
     // eslint-disable-next-line
   }, []);
 
@@ -243,9 +247,14 @@ const Wordle = ({ onBackToMenu }) => {
   };
 
   const handleNextWord = async () => {
+    if (state.isSuccess) {
+      dispatch({ type: 'INCREMENT_STREAK' });
+      dispatch({ type: 'ADD_TO_TOTAL_SCORE' });
+      dispatch({ type: 'SET_ANIMATE_SCORE', animateScore: true });
+    }
     dispatch({ type: 'SET_SHOW_MODAL', showModal: false });
     // Only reset streak/score if last game was a loss (not success)
-    await startNewGame(!state.isSuccess);
+    await startNewGame(!state.isSuccess, state.isSuccess);
   };
 
   const showGameEndModal = async (success, word) => {
@@ -372,10 +381,6 @@ const Wordle = ({ onBackToMenu }) => {
         dispatch({ type: 'SET_GAME_OVER', gameOver: true });
         dispatch({ type: 'SET_IS_SUCCESS', isSuccess: true });
         dispatch({ type: 'SET_COMPLETED_WORD', completedWord: state.targetWord });
-        dispatch({ type: 'INCREMENT_STREAK' });
-        dispatch({ type: 'ADD_TO_TOTAL_SCORE' });
-        dispatch({ type: 'SET_ANIMATE_STREAK', animateStreak: true });
-        dispatch({ type: 'SET_ANIMATE_SCORE', animateScore: true });
         getWordDefinition(state.targetWord).then(def => {
           dispatch({ type: 'SET_WORD_DEFINITION', wordDefinition: def });
           dispatch({ type: 'SET_SHOW_MODAL', showModal: true });
