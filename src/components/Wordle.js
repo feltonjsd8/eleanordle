@@ -4,6 +4,7 @@ import { getRandomWord, getWordDefinition, isValidWord, getDictionaryWords } fro
 import WordModal from './WordModal';
 import DefinitionModal from './DefinitionModal';
 import { getSuggestions } from '../services/suggestionService';
+import Logo from './Logo';
 
 const initialState = {
   guesses: Array(6).fill(''),
@@ -692,9 +693,7 @@ const Wordle = ({ onBackToMenu }) => {
           </div>
         </div>
         <div className="header-content">
-          <h1>
-            <span className="title-highlight">Eleanor</span>dle
-          </h1>
+          <h1><Logo /></h1>
         </div>
         <div className="header-actions">
           
