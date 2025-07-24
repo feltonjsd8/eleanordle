@@ -12,6 +12,11 @@ const Logo = () => (
           display: block;
           margin: 0 auto;
         }
+        @media (max-width: 600px) {
+          .eleanordle-logo {
+            max-width: 300px;
+          }
+        }
         @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Roboto:wght@700&display=swap');
         .eleanordle-logo-eleanor {
           font-family: 'Fredoka One', cursive;
