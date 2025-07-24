@@ -90,6 +90,18 @@
   transition: 0.3s;
 }
 
+.burger-menu-btn.open .burger-bar:nth-child(1) {
+  transform: rotate(-45deg) translate(-6px, 6px);
+}
+
+.burger-menu-btn.open .burger-bar:nth-child(2) {
+  opacity: 0;
+}
+
+.burger-menu-btn.open .burger-bar:nth-child(3) {
+  transform: rotate(45deg) translate(-6px, -6px);
+}
+
 .burger-dropdown {
   position: absolute;
   top: 48px;

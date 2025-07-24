@@ -721,7 +721,7 @@ const Wordle = ({ onBackToMenu }) => {
           </button>
           <div className="burger-menu-anchor">
             <button
-              className="burger-menu-btn"
+              className={`burger-menu-btn ${state.menuOpen ? 'open' : ''}`}
               aria-label="Open menu"
               onClick={() => dispatch({ type: 'SET_MENU_OPEN', menuOpen: !state.menuOpen })}
             >
@@ -816,7 +816,7 @@ const Wordle = ({ onBackToMenu }) => {
         </div>
         {state.showClue && state.clue && (
           <div className="clue-text" style={{marginBottom: 8, color: '#1a73e8', fontStyle: 'italic'}}>
-            Clue: {state.clue}
+            {state.clue}
           </div>
         )}
         <div className="keyboard">
