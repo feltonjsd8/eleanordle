@@ -147,7 +147,10 @@
   margin-bottom: 20px;
   width: 100%;
   max-width: 98vw;
+  min-width: 240px; /* Ensures grid is wide enough for centering */
   box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
 }
 
 .wordle-row {
@@ -160,6 +163,7 @@
   flex-wrap: nowrap;
   width: 100%;
   box-sizing: border-box;
+  justify-content: center; /* Center tiles in the row */
 }
 
 .row-score {
