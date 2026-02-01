@@ -680,10 +680,9 @@ const Wordle = ({ onBackToMenu }) => {
             </button>
             {state.menuOpen && (
               <div className="burger-dropdown" ref={menuRef}>
-                <button onClick={() => { startNewGame(true); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">New Game</button>
+                <button onClick={() => { startNewGame(3); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">New Game</button>
                 <button onClick={() => { revealAnswer(); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">Reveal</button>
                 <button onClick={() => dispatch({ type: 'SET_IS_CONTRAST_MODE', isContrastMode: !state.isContrastMode })} className="dropdown-item">Contrast Mode</button>
-                
               </div>
             )}
           </div>
