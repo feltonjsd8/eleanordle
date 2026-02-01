@@ -6,16 +6,19 @@ import DefinitionModal from './DefinitionModal';
 import { getSuggestions } from '../services/suggestionService';
 import Logo from './Logo';
 
+const DEFAULT_WORD_LENGTH = 3;
+const MAX_WORD_LENGTH = 10;
 const initialState = {
   guesses: Array(6).fill(''),
   currentGuess: '',
   currentRow: 0,
   targetWord: '',
+  wordLength: DEFAULT_WORD_LENGTH,
   gameOver: false,
   message: '',
   letterStates: {},
-  evaluations: Array(6).fill(null),
-  revealedLetters: Array(6).fill(null).map(() => Array(5).fill(false)),
+  evaluations: Array(6).fill(null).map(() => Array(DEFAULT_WORD_LENGTH).fill(null)),
+  revealedLetters: Array(6).fill(null).map(() => Array(DEFAULT_WORD_LENGTH).fill(false)),
   isLoading: false,
   showModal: false,
   wordDefinition: null,
@@ -33,38 +36,30 @@ const initialState = {
   usedSuggestions: [],
   isContrastMode: false,
   alwaysShowClue: true,
-  streak: 0,
-  score: 50,
-          totalScore: 0,
-          rowScores: Array(6).fill(null),
-          wrongPositionHistory: {},
-animateScore: false,
-animateStreak: false,
-        };;
+  wrongPositionHistory: {},
+  // Track the current word length for progression
+  nextWordLength: DEFAULT_WORD_LENGTH,
+};
 
 function reducer(state, action) {
   switch (action.type) {
     case 'RESET': {
       const alwaysShowClue = state.alwaysShowClue;
-      const resetStreak = action.resetStreak;
+      const wordLength = action.wordLength || (action.targetWord ? action.targetWord.length : DEFAULT_WORD_LENGTH);
       return {
         ...initialState,
         targetWord: action.targetWord,
+        wordLength,
+        guesses: Array(6).fill(''),
+        evaluations: Array(6).fill(null).map(() => Array(wordLength).fill(null)),
+        revealedLetters: Array(6).fill(null).map(() => Array(wordLength).fill(false)),
         alwaysShowClue,
         showClue: alwaysShowClue ? true : false,
-        streak: resetStreak ? 0 : (action.keepStreak ? state.streak : 0),
-        totalScore: resetStreak ? 0 : state.totalScore,
-        score: 50,
+        nextWordLength: state.nextWordLength,
       };
     }
-    case 'DECREMENT_SCORE':
-      return { ...state, score: Math.max(0, state.score - action.amount) };
-    case 'INCREMENT_STREAK':
-      return { ...state, streak: state.streak + 1 };
-    case 'RESET_STREAK':
-      return { ...state, streak: 0 };
-    case 'ADD_TO_TOTAL_SCORE':
-      return { ...state, totalScore: state.totalScore + state.score };
+    case 'SET_NEXT_WORD_LENGTH':
+      return { ...state, nextWordLength: action.nextWordLength };
     case 'SET_GUESSES':
       return { ...state, guesses: action.guesses };
     case 'SET_CURRENT_GUESS':
@@ -117,8 +112,7 @@ function reducer(state, action) {
       return { ...state, targetWord: action.targetWord };
     case 'SET_ALWAYS_SHOW_CLUE':
       return { ...state, alwaysShowClue: action.alwaysShowClue };
-    case 'SET_ROW_SCORES':
-      return { ...state, rowScores: action.rowScores };
+    // SET_ROW_SCORES removed
     case 'REVEAL_LETTER': {
       // Reveal a single letter in a row
       const { rowIndex, letterIndex } = action;
@@ -130,10 +124,7 @@ function reducer(state, action) {
       });
       return { ...state, revealedLetters };
     }
-    case 'SET_ANIMATE_SCORE':
-      return { ...state, animateScore: action.animateScore };
-    case 'SET_ANIMATE_STREAK':
-      return { ...state, animateStreak: action.animateStreak };
+    // SET_ANIMATE_SCORE, SET_ANIMATE_STREAK removed
     default:
       return state;
   }
@@ -146,15 +137,17 @@ const Wordle = ({ onBackToMenu }) => {
   // Cache for word definitions to avoid unnecessary API calls
   const definitionCache = useRef({});
 
-  const startNewGame = async (resetStreak = false, animate = false) => {
-    if (animate) {
-      dispatch({ type: 'SET_ANIMATE_SCORE', animateScore: true });
-      dispatch({ type: 'SET_ANIMATE_STREAK', animateStreak: true });
-    }
+  const startNewGame = async (customWordLength) => {
     dispatch({ type: 'SET_IS_LOADING', isLoading: true });
     try {
-      const newWord = await getRandomWord();
-      dispatch({ type: 'RESET', targetWord: newWord, keepStreak: !resetStreak, resetStreak });
+      // Use the provided word length or the nextWordLength from state
+      const wordLength = customWordLength || state.nextWordLength || DEFAULT_WORD_LENGTH;
+      const newWord = await getRandomWord(wordLength);
+      dispatch({
+        type: 'RESET',
+        targetWord: newWord,
+        wordLength
+      });
       try {
         const def = await getWordDefinition(newWord);
         dispatch({ type: 'SET_CLUE', clue: def.definitions[0]?.definition || 'No clue available' });
@@ -172,7 +165,7 @@ const Wordle = ({ onBackToMenu }) => {
   };
 
   useEffect(() => {
-    startNewGame(false, false);
+    startNewGame(DEFAULT_WORD_LENGTH);
     // eslint-disable-next-line
   }, []);
 
@@ -180,19 +173,19 @@ const Wordle = ({ onBackToMenu }) => {
     if (state.gameOver) return;
 
     if (key === 'ENTER') {
-      if (state.currentGuess.length !== 5) {
-        showMessage('Word must be 5 letters');
+      if (state.currentGuess.length !== state.wordLength) {
+        showMessage(`Word must be ${state.wordLength} letters`);
         return;
       }
       submitGuess();
     } else if (key === 'BACKSPACE') {
       const newGuess = state.currentGuess.slice(0, -1);
-      if (state.invalidGuess && newGuess.length < 5) dispatch({ type: 'SET_INVALID_GUESS', invalidGuess: false });
+      if (state.invalidGuess && newGuess.length < state.wordLength) dispatch({ type: 'SET_INVALID_GUESS', invalidGuess: false });
       dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: newGuess });
-    } else if (state.currentGuess.length < 5) {
+    } else if (state.currentGuess.length < state.wordLength) {
       if (/^[A-Z]$/.test(key)) {
         const newGuess = state.currentGuess + key;
-        if (state.invalidGuess && newGuess.length < 5) dispatch({ type: 'SET_INVALID_GUESS', invalidGuess: false });
+        if (state.invalidGuess && newGuess.length < state.wordLength) dispatch({ type: 'SET_INVALID_GUESS', invalidGuess: false });
         dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: newGuess });
       }
     }
@@ -215,28 +208,32 @@ const Wordle = ({ onBackToMenu }) => {
   }, [state.currentGuess, state.gameOver]);
 
   useEffect(() => {
-    if (state.currentGuess.length === 5) {
+    if (state.currentGuess.length === state.wordLength) {
       (async () => {
         const isValid = await isValidWord(state.currentGuess);
         dispatch({ type: 'SET_INVALID_GUESS', invalidGuess: !isValid });
       })();
-    } else if (state.invalidGuess && state.currentGuess.length < 5) {
+    } else if (state.invalidGuess && state.currentGuess.length < state.wordLength) {
       dispatch({ type: 'SET_INVALID_GUESS', invalidGuess: false });
     }
-  }, [state.currentGuess]);
+  }, [state.currentGuess, state.wordLength]);
 
   const evaluateGuess = (guess, target) => {
-    const evaluation = Array(5).fill('incorrect');
+    if (!guess || !target || typeof guess !== 'string' || typeof target !== 'string') {
+      return [];
+    }
+    const wordLength = Math.min(guess.length, target.length);
+    const evaluation = Array(wordLength).fill('incorrect');
     const targetLetters = target.split('');
     const guessLetters = guess.split('');
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < wordLength; i++) {
       if (guessLetters[i] === targetLetters[i]) {
         evaluation[i] = 'correct';
         targetLetters[i] = null;
         guessLetters[i] = null;
       }
     }
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < wordLength; i++) {
       if (guessLetters[i] === null) continue;
       const targetIndex = targetLetters.indexOf(guessLetters[i]);
       if (targetIndex !== -1) {
@@ -248,14 +245,12 @@ const Wordle = ({ onBackToMenu }) => {
   };
 
   const handleNextWord = async () => {
-    if (state.isSuccess) {
-      dispatch({ type: 'INCREMENT_STREAK' });
-      dispatch({ type: 'ADD_TO_TOTAL_SCORE' });
-      dispatch({ type: 'SET_ANIMATE_SCORE', animateScore: true });
-    }
     dispatch({ type: 'SET_SHOW_MODAL', showModal: false });
-    // Only reset streak/score if last game was a loss (not success)
-    await startNewGame(!state.isSuccess, state.isSuccess);
+    // If last game was a failure, reset to 3 letters
+    let nextLength = state.isSuccess ? state.wordLength + 1 : 3;
+    if (nextLength > MAX_WORD_LENGTH) nextLength = MAX_WORD_LENGTH;
+    dispatch({ type: 'SET_NEXT_WORD_LENGTH', nextWordLength: nextLength });
+    await startNewGame(nextLength);
   };
 
   const showGameEndModal = async (success, word) => {
@@ -289,7 +284,8 @@ const Wordle = ({ onBackToMenu }) => {
   };
 
   const revealRowLetters = (rowIndex) => {
-    for (let i = 0; i < 5; i++) {
+    const wordLength = state.wordLength;
+    for (let i = 0; i < wordLength; i++) {
       setTimeout(() => {
         dispatch({ type: 'REVEAL_LETTER', rowIndex, letterIndex: i });
       }, i * 200);
@@ -302,41 +298,11 @@ const Wordle = ({ onBackToMenu }) => {
       return;
     }
     const evaluation = evaluateGuess(state.currentGuess, state.targetWord);
-    const newRowScores = [...state.rowScores];
-    let score_reduction = 0;
+    // scoring removed
     const newLetterStates = { ...state.letterStates }; // Get current letter states
     const newWrongPositionHistory = JSON.parse(JSON.stringify(state.wrongPositionHistory || {}));
 
-    if (state.currentGuess !== state.targetWord) {
-      for (let i = 0; i < evaluation.length; i++) {
-        const letter = state.currentGuess[i];
-        const currentOverallState = newLetterStates[letter];
-        let score = 0;
-
-        if (evaluation[i] === 'correct') {
-          if (currentOverallState !== 'correct') {
-            score = 5;
-          }
-        } else if (evaluation[i] === 'wrong-position') {
-          const history = newWrongPositionHistory[letter] || [];
-          if (!history.includes(i)) {
-            score = 3;
-            if (!newWrongPositionHistory[letter]) {
-              newWrongPositionHistory[letter] = [];
-            }
-            newWrongPositionHistory[letter].push(i);
-          }
-        } else if (evaluation[i] === 'incorrect') {
-          if (currentOverallState !== 'correct' && currentOverallState !== 'wrong-position' && currentOverallState !== 'incorrect') {
-            score = 1;
-          }
-        }
-        score_reduction += score;
-      }
-    }
-    newRowScores[state.currentRow] = state.score - score_reduction;
-    dispatch({ type: 'SET_ROW_SCORES', rowScores: newRowScores });
-    dispatch({ type: 'DECREMENT_SCORE', amount: score_reduction });
+    // scoring logic removed
     dispatch({ type: 'SET_WRONG_POSITION_HISTORY', wrongPositionHistory: newWrongPositionHistory });
     const newEvaluations = [...state.evaluations];
     newEvaluations[state.currentRow] = evaluation;
@@ -345,7 +311,7 @@ const Wordle = ({ onBackToMenu }) => {
     newGuesses[state.currentRow] = state.currentGuess;
     dispatch({ type: 'SET_GUESSES', guesses: newGuesses });
     // Always create a new revealedLetters array for the row
-    dispatch({ type: 'SET_REVEALED_LETTERS', revealedLetters: state.revealedLetters.map((arr, idx) => idx === state.currentRow ? Array(5).fill(false) : arr.slice()) });
+    dispatch({ type: 'SET_REVEALED_LETTERS', revealedLetters: state.revealedLetters.map((arr, idx) => idx === state.currentRow ? Array(state.wordLength).fill(false) : arr.slice()) });
     revealRowLetters(state.currentRow);
     // Update letter states for keyboard
     for (let i = 0; i < state.currentGuess.length; i++) {
@@ -391,7 +357,8 @@ const Wordle = ({ onBackToMenu }) => {
       setTimeout(() => {
         dispatch({ type: 'SET_GAME_OVER', gameOver: true });
         dispatch({ type: 'SET_COMPLETED_WORD', completedWord: state.targetWord });
-        dispatch({ type: 'RESET_STREAK' });
+        // Reset word length to 3 on failure
+        dispatch({ type: 'SET_NEXT_WORD_LENGTH', nextWordLength: 3 });
         getWordDefinition(state.targetWord).then(def => {
           dispatch({ type: 'SET_WORD_DEFINITION', wordDefinition: def });
           dispatch({ type: 'SET_SHOW_MODAL', showModal: true });
@@ -464,7 +431,7 @@ const Wordle = ({ onBackToMenu }) => {
     dispatch({ type: 'SET_GUESSES', guesses: newGuesses });
     dispatch({ type: 'SET_EVALUATIONS', evaluations: newEvaluations });
     dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: '' });
-    dispatch({ type: 'SET_REVEALED_LETTERS', revealedLetters: state.revealedLetters.map((arr, idx) => idx === revealRow ? Array(5).fill(false) : [...arr]) });
+    dispatch({ type: 'SET_REVEALED_LETTERS', revealedLetters: state.revealedLetters.map((arr, idx) => idx === revealRow ? Array(state.wordLength).fill(false) : [...arr]) });
     revealRowLetters(revealRow);
     const newLetterStates = { ...state.letterStates };
     for (let i = 0; i < answer.length; i++) {
@@ -503,7 +470,8 @@ const Wordle = ({ onBackToMenu }) => {
 
   const handleShowSuggestions = useCallback(async () => {
     dispatch({ type: 'SET_IS_LOADING', isLoading: true });
-    const correct = Array(5).fill(null);
+    const wordLength = state.wordLength;
+    const correct = Array(wordLength).fill(null);
     const wrongPosition = new Set();
     const present = new Set();
     const absent = new Set();
@@ -511,7 +479,7 @@ const Wordle = ({ onBackToMenu }) => {
       const evalRow = state.evaluations[row];
       const guess = state.guesses[row] || '';
       if (!evalRow) continue;
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < wordLength; i++) {
         const letter = guess[i]?.toUpperCase();
         if (!letter) continue;
         if (evalRow[i] === 'correct') correct[i] = letter;
@@ -522,7 +490,7 @@ const Wordle = ({ onBackToMenu }) => {
       }
     }
     const { getWordFinderSuggestions } = await import('../services/suggestionService');
-    const words = await getWordFinderSuggestions(correct, present, absent, state.targetWord, wrongPosition);
+    const words = await getWordFinderSuggestions(correct, present, absent, wordLength, state.targetWord, wrongPosition);
     const availableWords = words.filter(word => !state.usedSuggestions.includes(word));
     dispatch({ type: 'SET_IS_LOADING', isLoading: false });
     if (availableWords.length > 0) {
@@ -532,7 +500,7 @@ const Wordle = ({ onBackToMenu }) => {
       dispatch({ type: 'SET_PENDING_SUGGESTION', pendingSuggestion: true });
     } else {
       dispatch({ type: 'SET_IS_LOADING', isLoading: true });
-      const newWords = await getDictionaryWords();
+      const newWords = await getDictionaryWords(wordLength);
       const newAvailableWords = newWords.filter(word => !state.usedSuggestions.includes(word));
       dispatch({ type: 'SET_IS_LOADING', isLoading: false });
       if (newAvailableWords.length > 0) {
@@ -544,22 +512,28 @@ const Wordle = ({ onBackToMenu }) => {
         showMessage('No new suggestions found');
       }
     }
-  }, [state.evaluations, state.guesses, state.usedSuggestions, state.targetWord]);
+  }, [state.evaluations, state.guesses, state.usedSuggestions, state.targetWord, state.wordLength]);
 
   useEffect(() => {
-    if (state.pendingSuggestion && state.currentGuess.length === 5) {
+    if (state.pendingSuggestion && state.currentGuess.length === state.wordLength) {
       dispatch({ type: 'SET_PENDING_SUGGESTION', pendingSuggestion: false });
       submitGuess();
     }
     // eslint-disable-next-line
-  }, [state.pendingSuggestion, state.currentGuess]);
+  }, [state.pendingSuggestion, state.currentGuess, state.wordLength]);
 
-  const absentLetters = Array.from(new Set(
-    state.guesses
-      .join('')
-      .split('')
-      .filter(l => l && !state.targetWord.includes(l))
-  ));
+  // Defensive: Only calculate absentLetters if targetWord is a valid string
+  const absentLetters =
+    typeof state.targetWord === 'string' && Array.isArray(state.guesses)
+      ? Array.from(
+          new Set(
+            state.guesses
+              .join('')
+              .split('')
+              .filter(l => l && !state.targetWord.includes(l))
+          )
+        )
+      : [];
 
   useEffect(() => {
     const handleMenuShortcuts = (e) => {
@@ -583,19 +557,7 @@ const Wordle = ({ onBackToMenu }) => {
     return () => window.removeEventListener('keydown', handleMenuShortcuts);
   }, [state.showClue, getClue, handleShowSuggestions]);
 
-  useEffect(() => {
-    if (state.animateStreak) {
-      const timer = setTimeout(() => dispatch({ type: 'SET_ANIMATE_STREAK', animateStreak: false }), 500);
-      return () => clearTimeout(timer);
-    }
-  }, [state.animateStreak]);
-
-  useEffect(() => {
-    if (state.animateScore) {
-      const timer = setTimeout(() => dispatch({ type: 'SET_ANIMATE_SCORE', animateScore: false }), 500);
-      return () => clearTimeout(timer);
-    }
-  }, [state.animateScore]);
+  // animateStreak/animateScore effects removed
 
   // Speech recognition for microphone input
   const recognizingRef = useRef(false);
@@ -664,7 +626,7 @@ const Wordle = ({ onBackToMenu }) => {
         ref={inputRef}
         type="text"
         value={state.currentGuess}
-        maxLength={5}
+        maxLength={state.wordLength}
         autoFocus
         style={{
           position: 'absolute',
@@ -678,20 +640,7 @@ const Wordle = ({ onBackToMenu }) => {
         readOnly
       />
       <div className="game-header">
-        <div className="score-streak-container">
-          <div className={`streak-display ${state.animateStreak ? 'animate' : ''}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-fire" viewBox="0 0 16 16">
-              <path d="M8 16c3.314 0 6-2 6-5.5 0-1.5-.5-4-2.5-6 .25 1.5-1.25 2-1.25 2C11 4 9 .5 6 0c.357 2 .5 4-2 6-1.25 1-2 2.729-2 4.5C2 14 4.686 16 8 16m0-1c-1.657 0-3-1-3-2.75 0-.75.25-2 1.25-3C6.125 10 7 10.5 7 10.5c-.375-1.25.5-3.25 2-3.5-.179 1-.25 2 1 3 .625.5 1 1.364 1 2.25C11 14 9.657 15 8 15"/>
-            </svg>
-            <span>{state.streak}</span>
-          </div>
-          <div className={`score-display ${state.animateScore ? 'animate' : ''}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-              <path d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279-7.416-3.967-7.417 3.967 1.481-8.279-6.064-5.828 8.332-1.151z"/>
-            </svg>
-            <span>{state.totalScore}</span>
-          </div>
-        </div>
+        {/* score-streak-container removed */}
         <div className="header-content">
           <h1><Logo /></h1>
         </div>
@@ -765,7 +714,14 @@ const Wordle = ({ onBackToMenu }) => {
               }
             }
             return (
-              <div key={rowIndex} className="wordle-row">
+              <div
+                key={rowIndex}
+                className="wordle-row"
+                style={{
+                  '--wordle-row-columns': `repeat(${state.wordLength}, 1fr)`,
+                  '--tile-size': `min(60px, max(32px, calc(60vw / ${state.wordLength})))`
+                }}
+              >
                 {rowIndex < state.currentRow && state.guesses[rowIndex] && showDefinitionIcon && (
                   <button
                     className="definition-icon-btn"
@@ -779,7 +735,7 @@ const Wordle = ({ onBackToMenu }) => {
                     </svg>
                   </button>
                 )}
-                {Array.from({ length: 5 }, (_, index) => (
+                {Array.from({ length: state.wordLength }, (_, index) => (
                   <div
                     key={index}
                     className={`wordle-tile ${getTileClass(guess[index], index, rowIndex)}${rowIndex === state.currentRow && state.invalidGuess ? ' invalid' : ''}`}
@@ -805,11 +761,7 @@ const Wordle = ({ onBackToMenu }) => {
                     
                   </div>
                 ))}
-                {state.rowScores[rowIndex] !== null && (
-                  <div className="row-score">
-                    {state.rowScores[rowIndex]}
-                  </div>
-                )}
+                {/* rowScores display removed */}
               </div>
             );
           })}

@@ -2,23 +2,22 @@
 import { getDictionaryWords } from './dictionaryService';
 
 /**
- * Filters words based on known correct, present, and absent letters.
- * @param {string[]} allWords - List of all possible 5-letter words.
+ * Suggests words matching the user's current guess and known letter states, using Datamuse API for the correct word length.
  * @param {string} currentGuess - The user's current guess (may be partial).
  * @param {object} letterStates - { A: 'correct'|'wrong-position'|'incorrect' }
  * @param {Array} evaluations - Array of evaluations for each guess row
- * @returns {string[]} Up to 10 suggested words
+ * @param {number} wordLength - Length of the answer word
+ * @returns {Promise<string[]>} Up to 10 suggested words
  */
-export async function getSuggestions(currentGuess, letterStates, evaluations) {
-  const allWords = (await getDictionaryWords()).map(w => w.toUpperCase());
+export async function getSuggestions(currentGuess, letterStates, evaluations, wordLength = 5) {
   // Build constraints from evaluations
-  const correct = Array(5).fill(null);
+  const correct = Array(wordLength).fill(null);
   const present = new Set();
   const absent = new Set();
 
   evaluations.forEach((evalRow, rowIdx) => {
     if (!evalRow) return;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < wordLength; i++) {
       if (!evalRow[i]) continue;
       const letter = currentGuess[i]?.toUpperCase();
       if (!letter) continue;
@@ -28,30 +27,59 @@ export async function getSuggestions(currentGuess, letterStates, evaluations) {
     }
   });
 
-  // Filter words
-  const filtered = allWords.filter(word => {
-    // Must match correct letters in position
-    for (let i = 0; i < 5; i++) {
-      if (correct[i] && word[i] !== correct[i]) return false;
+  // Use Datamuse API to fetch suggestions for the correct word length
+  const pattern = correct.map(l => (l ? l.toLowerCase() : '?')).join('');
+  const url = `https://api.datamuse.com/words?sp=${pattern || '?'.repeat(wordLength)}&max=1000`;
+  let suggestions = [];
+  try {
+    const resp = await fetch(url);
+    if (resp.ok) {
+      const data = await resp.json();
+      suggestions = data
+        .map(w => w.word.toUpperCase())
+        .filter(word => {
+          if (word.length !== wordLength || !/^[A-Z]+$/.test(word)) {
+            return false;
+          }
+          // Must not contain any absent letters
+          for (const letter of absent) {
+            if (word.includes(letter)) return false;
+          }
+          // Must contain all present letters
+          for (const letter of present) {
+            if (!word.includes(letter)) return false;
+          }
+          // If user has typed some letters, must match those
+          for (let i = 0; i < currentGuess.length; i++) {
+            if (currentGuess[i] && word[i] !== currentGuess[i].toUpperCase()) return false;
+          }
+          return true;
+        });
     }
-    // Must include all present letters (but not in the same position)
-    for (let l of present) {
-      if (!word.includes(l)) return false;
-      for (let i = 0; i < 5; i++) {
-        if (correct[i] !== l && word[i] === l) return false;
+  } catch (e) {
+    // ignore
+  }
+  // Fallback to local dictionary if API fails or returns too few results
+  if (!suggestions || suggestions.length < 5) {
+    const allWords = (await getDictionaryWords(wordLength)).map(w => w.toUpperCase());
+    suggestions = allWords.filter(word => {
+      if (word.length !== wordLength) return false;
+      for (const letter of absent) {
+        if (word.includes(letter)) return false;
       }
-    }
-    // Must not include absent letters
-    for (let l of absent) {
-      if (word.includes(l)) return false;
-    }
-    // If user has typed some letters, must match those
-    for (let i = 0; i < currentGuess.length; i++) {
-      if (currentGuess[i] && word[i] !== currentGuess[i].toUpperCase()) return false;
-    }
-    return true;
-  });
-  return filtered.slice(0, 10);
+      for (const letter of present) {
+        if (!word.includes(letter)) return false;
+      }
+      for (let i = 0; i < correct.length; i++) {
+        if (correct[i] && word[i] !== correct[i]) return false;
+      }
+      for (let i = 0; i < currentGuess.length; i++) {
+        if (currentGuess[i] && word[i] !== currentGuess[i].toUpperCase()) return false;
+      }
+      return true;
+    });
+  }
+  return suggestions.slice(0, 10);
 }
 
 /**
@@ -59,17 +87,18 @@ export async function getSuggestions(currentGuess, letterStates, evaluations) {
  * @param {string} targetWord - The word to match letter set.
  * @returns {Promise<string[]>}
  */
-export async function getDatamuseSuggestions(targetWord) {
+export async function getDatamuseSuggestions(targetWord, wordLength = 5) {
   const uniqueLetters = Array.from(new Set(targetWord.toLowerCase().split('')));
   const allowed = new Set(uniqueLetters);
-  const url = `https://api.datamuse.com/words?sp=?????&max=1000`;
+  const pattern = '?'.repeat(wordLength);
+  const url = `https://api.datamuse.com/words?sp=${pattern}&max=1000`;
   try {
     const resp = await fetch(url);
     const data = await resp.json();
     const filtered = data
       .map(w => w.word.toUpperCase())
       .filter(word =>
-        word.length === 5 &&
+        word.length === wordLength &&
         word.split('').every(l => allowed.has(l.toLowerCase())) &&
         word.split('').some(l => allowed.has(l.toLowerCase()))
       );
@@ -85,15 +114,16 @@ export async function getDatamuseSuggestions(targetWord) {
  * @param {Set<string>} present - Set of letters that must be present somewhere in the word.
  * @returns {Promise<string[]>}
  */
-export async function getDatamuseValidSuggestions(correct, present) {
-  const url = `https://api.datamuse.com/words?sp=?????&max=1000`;
+export async function getDatamuseValidSuggestions(correct, present, wordLength = 5) {
+  const pattern = '?'.repeat(wordLength);
+  const url = `https://api.datamuse.com/words?sp=${pattern}&max=1000`;
   try {
     const resp = await fetch(url);
     const data = await resp.json();
     const filtered = data
       .map(w => w.word.toUpperCase())
       .filter(word =>
-        word.length === 5 &&
+        word.length === wordLength &&
         // All correct letters in correct positions
         correct.every((l, i) => !l || word[i] === l) &&
         // All present letters somewhere in the word
@@ -115,48 +145,70 @@ export async function getDatamuseValidSuggestions(correct, present) {
  * @param {Set<string>} absent - Set of letters that must NOT be present in the word.
  * @returns {Promise<string[]>}
  */
-export async function getWordFinderSuggestions(correct, present, absent = new Set(), targetWord, wrongPosition = new Set()) {
-  // Build the 'spelled-like' pattern for Datamuse, e.g., 'a?p?l'
-  const pattern = correct.map(l => (l ? l.toLowerCase() : '?')).join('');
+export async function getWordFinderSuggestions(correct, present, absent = new Set(), wordLength = 5, targetWord, wrongPosition = new Set()) {
+  // Build the 'spelled-like' pattern for Datamuse, e.g., 'a?p?l' or '?????'
+  const pattern = Array.isArray(correct) && correct.length > 0
+    ? correct.map(l => (l ? l.toLowerCase() : '?')).join('')
+    : '?'.repeat(wordLength);
   const url = `https://api.datamuse.com/words?sp=${pattern}&max=1000`;
 
+  let suggestions = [];
   try {
     const resp = await fetch(url);
-    if (!resp.ok) {
-      console.error('Datamuse API request failed:', resp.status);
-      return [];
+    if (resp.ok) {
+      const data = await resp.json();
+      suggestions = data
+        .map(w => w.word.toUpperCase())
+        .filter(word => {
+          if (word.length !== wordLength || !/^[A-Z]+$/.test(word) || word === targetWord) {
+            return false;
+          }
+          // Rule 1: Must not contain any absent letters.
+          for (const letter of absent) {
+            if (word.includes(letter)) return false;
+          }
+          // Rule 2: Must contain all 'present' letters.
+          for (const letter of present) {
+            if (!word.includes(letter)) return false;
+          }
+          // Rule 3: Must not place letters in the same wrong position.
+          for (const item of wrongPosition) {
+            const [letter, position] = item.split('-');
+            if (word[parseInt(position)] === letter) return false;
+          }
+          return true;
+        });
     }
-    const data = await resp.json();
+  } catch (e) {
+    console.error('Error fetching suggestions from Datamuse:', e);
+  }
 
-    const suggestions = data
-      .map(w => w.word.toUpperCase())
-      .filter(word => {
-        if (word.length !== 5 || !/^[A-Z]{5}$/.test(word) || word === targetWord) {
-          return false;
-        }
-
-        // Rule 1: Must not contain any absent letters.
+  // Fallback: use local dictionary if Datamuse fails or returns too few results
+  if (!suggestions || suggestions.length < 5) {
+    try {
+      const allWords = (await getDictionaryWords(wordLength)).map(w => w.toUpperCase());
+      suggestions = allWords.filter(word => {
+        if (word.length !== wordLength || word === targetWord) return false;
         for (const letter of absent) {
           if (word.includes(letter)) return false;
         }
-
-        // Rule 2: Must contain all 'present' letters.
         for (const letter of present) {
           if (!word.includes(letter)) return false;
         }
-
-        // Rule 3: Must not place letters in the same wrong position.
         for (const item of wrongPosition) {
           const [letter, position] = item.split('-');
           if (word[parseInt(position)] === letter) return false;
         }
-
+        if (Array.isArray(correct)) {
+          for (let i = 0; i < correct.length; i++) {
+            if (correct[i] && word[i] !== correct[i]) return false;
+          }
+        }
         return true;
       });
-
-    return suggestions.slice(0, 20);
-  } catch (e) {
-    console.error('Error fetching suggestions from Datamuse:', e);
-    return [];
+    } catch (e) {
+      // ignore
+    }
   }
+  return suggestions.slice(0, 20);
 }

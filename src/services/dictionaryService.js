@@ -55,7 +55,7 @@ export const getWordDefinition = async (word) => {
             }]
         };
     }
-};
+}
 
 export const isValidWord = async (word) => {
     // First check our cache
@@ -95,15 +95,28 @@ function getRandomItem(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
 }
 
-export const getRandomWord = async (excludeWords = []) => {
+// Accepts a random word length between 3 and 10, or a specific word length
+export const getRandomWord = async (wordLengthOrExcludeWords = [], maybeExcludeWords) => {
+    // Support both getRandomWord(wordLength) and getRandomWord(excludeWords)
+    let wordLength = 3;
+    let excludeWords = [];
+    if (typeof wordLengthOrExcludeWords === 'number') {
+        wordLength = wordLengthOrExcludeWords;
+        excludeWords = Array.isArray(maybeExcludeWords) ? maybeExcludeWords : [];
+    } else if (Array.isArray(wordLengthOrExcludeWords)) {
+        // Old usage: getRandomWord(excludeWords)
+        wordLength = Math.floor(Math.random() * 8) + 3;
+        excludeWords = wordLengthOrExcludeWords;
+    }
     try {
         // Try to get words from cache first
-        let words = wordCache.get('words');
+        let cacheKey = `words_${wordLength}`;
+        let words = wordCache.get(cacheKey);
 
         // If not in cache or running low on words, fetch new ones
         if (!words || words.length < 10) {
-            words = await getDictionaryWords();
-            wordCache.set('words', words);
+            words = await getDictionaryWords(wordLength);
+            wordCache.set(cacheKey, words);
         }
 
         // Filter out excluded words
@@ -111,8 +124,8 @@ export const getRandomWord = async (excludeWords = []) => {
 
         // If we're running out of words, fetch new ones
         if (availableWords.length < 5) {
-            words = await getDictionaryWords();
-            wordCache.set('words', words);
+            words = await getDictionaryWords(wordLength);
+            wordCache.set(cacheKey, words);
             availableWords = words.filter(word => !excludeWords.includes(word));
         }
 
@@ -121,26 +134,33 @@ export const getRandomWord = async (excludeWords = []) => {
         for (let i = 0; i < maxTries; i++) {
             const selectedWord = getRandomItem(availableWords);
             const def = await getWordDefinition(selectedWord);
-            if (def && def.definitions && def.definitions.length > 0 && def.definitions[0].definition !== 'Definition not available') {
+            if (def && def.definitions && def.definitions.length > 0 && def.definitions[0].definition && def.definitions[0].definition !== 'Definition not available') {
                 // Remove the selected word from the cache to avoid repetition
-                wordCache.set('words', words.filter(w => w !== selectedWord));
+                wordCache.set(cacheKey, words.filter(w => w !== selectedWord));
                 return selectedWord;
             } else {
                 // Remove this word from availableWords and try again
                 availableWords = availableWords.filter(w => w !== selectedWord);
             }
         }
-        // If no word with a clue is found, fetch a new batch and try again
-        words = await getDictionaryWords();
-        wordCache.set('words', words);
-        return getRandomWord(excludeWords);
+        // If no word found with a clue, just return a random one
+        if (availableWords.length > 0) {
+            return getRandomItem(availableWords);
+        }
+        // As a last resort, try again with fallback
+        words = await getDictionaryWords(wordLength);
+        if (words.length > 0) {
+            return getRandomItem(words);
+        }
+        return null;
     } catch (error) {
-        console.error('Error getting random word:', error);
-        return 'ERROR';
+        console.error('Error in getRandomWord:', error);
+        return null;
     }
 };
 
-export const getDictionaryWords = async () => {
+// Accepts a wordLength parameter (default 5 for backward compatibility)
+export const getDictionaryWords = async (wordLength = 5) => {
     try {
         const apiWords = new Set();
         const letterGroups = [
@@ -154,32 +174,28 @@ export const getDictionaryWords = async () => {
         // Fetch words for each letter group
         for (const group of letterGroups) {
             const randomLetter = group[Math.floor(Math.random() * group.length)];
+            // Build the pattern for the desired word length
+            const pattern = `${randomLetter}${'?'.repeat(wordLength - 1)}`;
             const queries = [
-                `sp=${randomLetter}????`, // exactly 5 letters, starting with our chosen letter
+                `sp=${pattern}`,
                 'md=f' // include frequency information
             ];
 
             const response = await fetch(`${DATAMUSE_API_URL}?${queries.join('&')}&max=50`);
-                    
             if (!response.ok) {
                 console.warn(`Failed to fetch words for letter ${randomLetter}`);
                 continue;
             }
-
-            // The Datamuse API can return 202 Accepted if it's under load.
-            // This response has no body, so we should skip it and continue the loop.
             if (response.status === 202) {
                 console.warn(`Datamuse API returned 202 Accepted for letter ${randomLetter}. Skipping.`);
                 continue;
             }
 
             const words = await response.json();
-            console.log(`Received ${words.length} words starting with ${randomLetter}`);
-            
             // Filter and add valid words to the set (no definition check here)
             for (const wordObj of words) {
                 const wordStr = wordObj.word.toUpperCase();
-                if (!isCommonWord(wordStr) && /^[A-Z]{5}$/i.test(wordObj.word)) {
+                if (!isCommonWord(wordStr) && new RegExp(`^[A-Z]{${wordLength}}$`, 'i').test(wordObj.word)) {
                     apiWords.add(wordStr);
                     validWordCache.add(wordStr); // Add to cache for future validation
                 }
@@ -188,7 +204,6 @@ export const getDictionaryWords = async () => {
 
         // Use matcher.hasMatch to filter out profane words
         const allWords = [...apiWords].filter(word => !matcher.hasMatch(word));
-        console.log(`Found ${allWords.length} valid words across different starting letters`);
 
         if (allWords.length === 0) {
             throw new Error('No valid words found');
@@ -203,14 +218,27 @@ export const getDictionaryWords = async () => {
         return allWords;
     } catch (error) {
         console.error('Error in getDictionaryWords:', error);
-        // Add fallback words to cache as well
+        // Expanded fallback words for each length (3-10)
         const fallbackWords = [
-            'HAPPY', 'BRAIN', 'CLOUD', 'DREAM', 'EAGLE',
-            'FLAME', 'GHOST', 'HEART', 'IVORY', 'JOKER',
-            'LIGHT', 'MUSIC', 'NIGHT', 'OCEAN', 'PEARL',
-            'QUICK', 'RIVER', 'STORM', 'TIGER', 'VOICE'
+            // 3-letter
+            'SUN', 'DOG', 'CAT', 'CAR', 'BEE', 'SKY', 'MAP', 'PEN', 'BOX', 'HAT',
+            // 4-letter
+            'TREE', 'MOON', 'FISH', 'BIRD', 'LION', 'WOLF', 'FROG', 'SHIP', 'STAR', 'FIRE',
+            // 5-letter
+            'HAPPY', 'BRAIN', 'CLOUD', 'DREAM', 'EAGLE', 'PLANT', 'SNAKE', 'WATER', 'EARTH', 'MOUSE',
+            // 6-letter
+            'FLAMES', 'GHOSTS', 'HEARTS', 'IVORYS', 'JOKERS', 'PLANET', 'ORANGE', 'PURPLE', 'SILVER', 'BUTTON',
+            // 7-letter
+            'MUSICAL', 'NIGHTLY', 'OCEANIC', 'PEARLED', 'QUICKLY', 'CAPTURE', 'FANTASY', 'GRAVITY', 'HORIZON', 'JOURNEY',
+            // 8-letter
+            'RIVERTON', 'STORMING', 'TIGERING', 'VOICINGS', 'ABSOLUTE', 'BASEBALL', 'CAMPFIRE', 'DARKNESS', 'ECLIPSES', 'FEATHERS',
+            // 9-letter
+            'CELEBRATE', 'EXPLORING', 'HAPPINESS', 'KNOWLEDGE', 'MOTIVATOR', 'ADVENTURES', 'BLUEBERRY', 'CROSSWORD', 'DISCOVERY', 'EDUCATION',
+            // 10-letter
+            'CELEBRATION', 'EXPERIENCE', 'HAPPINESS', 'KNOWLEDGE', 'MOTIVATION', 'ADVENTURERS', 'BLACKBERRYS', 'COMPLEXITY', 'DEFINITION', 'EVERLASTING'
         ];
         fallbackWords.forEach(word => validWordCache.add(word));
-        return fallbackWords;
+        // Only return fallback words of the requested length
+        return fallbackWords.filter(w => w.length === wordLength);
     }
 };

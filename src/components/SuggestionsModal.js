@@ -8,8 +8,10 @@ const SuggestionsModal = ({ isOpen, onClose, evaluations, guesses, onPickSuggest
   useEffect(() => {
     if (!isOpen) return;
     setLoading(true);
+    // Determine word length from guesses or evaluations (fallback to 5)
+    const wordLength = guesses && guesses[0] ? guesses[0].length : (evaluations && evaluations[0] ? evaluations[0].length : 5);
     // Extract correct, present, and absent letters from all previous guesses.
-    const correct = Array(5).fill(null);
+    const correct = Array(wordLength).fill(null);
     const present = new Set();
     const absent = new Set();
     const allCorrectOrPresentLetters = new Set();
@@ -19,7 +21,7 @@ const SuggestionsModal = ({ isOpen, onClose, evaluations, guesses, onPickSuggest
       const evalRow = evaluations[row];
       const guess = guesses[row] || '';
       if (!evalRow) continue;
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < wordLength; i++) {
         const letter = guess[i]?.toUpperCase();
         if (!letter) continue;
         if (evalRow[i] === 'correct') {
@@ -39,7 +41,7 @@ const SuggestionsModal = ({ isOpen, onClose, evaluations, guesses, onPickSuggest
       const evalRow = evaluations[row];
       const guess = guesses[row] || '';
       if (!evalRow) continue;
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < wordLength; i++) {
         const letter = guess[i]?.toUpperCase();
         if (!letter) continue;
         if (evalRow[i] === 'incorrect' && !allCorrectOrPresentLetters.has(letter)) {
@@ -47,15 +49,14 @@ const SuggestionsModal = ({ isOpen, onClose, evaluations, guesses, onPickSuggest
         }
       }
     }
-    import('../services/suggestionService').then(({ getWordFinderSuggestions }) =>
-      getWordFinderSuggestions(correct, present, absent)
+    import('../services/suggestionService').then(({ getSuggestions }) =>
+      getSuggestions(guesses[guesses.length - 1] || '', {}, evaluations, wordLength)
     ).then(words => {
-      // Robustly handle different API response shapes
       let suggestions = [];
       if (Array.isArray(words)) {
-        suggestions = words.filter(w => typeof w === 'string' && w.length === 5);
+        suggestions = words.filter(w => typeof w === 'string' && w.length === wordLength);
       } else if (words && Array.isArray(words.results)) {
-        suggestions = words.results.map(w => w.word.toUpperCase()).filter(w => w.length === 5);
+        suggestions = words.results.map(w => w.word.toUpperCase()).filter(w => w.length === wordLength);
       }
       setSuggestions(suggestions);
       setLoading(false);
