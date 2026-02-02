@@ -697,21 +697,6 @@ const Wordle = ({ onBackToMenu }) => {
       <div className="game-container">
         <div className="wordle-grid">
           {state.guesses.map((guess, rowIndex) => {
-            let showDefinitionIcon = false;
-            if (rowIndex < state.currentRow && state.guesses[rowIndex]) {
-              const cached = definitionCache.current[state.guesses[rowIndex]];
-              if (
-                cached &&
-                Array.isArray(cached.definitions) &&
-                cached.definitions[0]?.definition &&
-                cached.definitions[0].definition !== 'Definition not available'
-              ) {
-                // Only show icon if a real definition is cached
-                showDefinitionIcon = true;
-              } else {
-                showDefinitionIcon = false;
-              }
-            }
             return (
               <div
                 key={rowIndex}
@@ -721,45 +706,45 @@ const Wordle = ({ onBackToMenu }) => {
                   '--tile-size': `min(60px, max(32px, calc(60vw / ${state.wordLength})))`
                 }}
               >
-                {rowIndex < state.currentRow && state.guesses[rowIndex] && showDefinitionIcon && (
-                  <button
-                    className="definition-icon-btn"
-                    onClick={() => handleShowDefinition(state.guesses[rowIndex])}
-                    title={`View definition of ${state.guesses[rowIndex]}`}
-                    aria-label={`View definition of ${state.guesses[rowIndex]}`}
-                  >
-                    {/* Open Book icon from Wikimedia Commons, CC0 */}
-                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none">
-                      <path d="M2 6.5C2 5.12 3.12 4 4.5 4H19.5C20.88 4 22 5.12 22 6.5V19.5C22 20.33 21.33 21 20.5 21C17.46 21 14.42 20.5 12 19.5C9.58 20.5 6.54 21 3.5 21C2.67 21 2 20.33 2 19.5V6.5ZM4.5 6C4.22 6 4 6.22 4 6.5V18.5C6.97 18.5 9.97 18.03 12 17.13C14.03 18.03 17.03 18.5 20 18.5V6.5C20 6.22 19.78 6 19.5 6H4.5Z" fill="#111"/>
-                    </svg>
-                  </button>
-                )}
-                {Array.from({ length: state.wordLength }, (_, index) => (
-                  <div
-                    key={index}
-                    className={`wordle-tile ${getTileClass(guess[index], index, rowIndex)}${rowIndex === state.currentRow && state.invalidGuess ? ' invalid' : ''}`}
-                    style={getFlipDelay(index)}
-                  >
-                    {rowIndex === state.revealedAnswerRow ? state.targetWord[index] : (rowIndex === state.currentRow ? state.currentGuess[index] || '' : state.guesses[rowIndex][index] || '')}
-                    {state.isContrastMode && state.evaluations[rowIndex] && state.revealedLetters[rowIndex][index] && (
-                      <div className="contrast-icon">
-                        {state.evaluations[rowIndex][index] === 'correct' && (
-                          <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
-                            <path d="M0 0h24v24H0V0z" fill="none"/>
-                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-                          </svg>
-                        )}
-                        {state.evaluations[rowIndex][index] === 'wrong-position' && (
-                          <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
-                            <path d="M0 0h24v24H0V0z" fill="none"/>
-                            <path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/>
-                          </svg>
-                        )}
-                      </div>
-                    )}
-                    
-                  </div>
-                ))}
+                {Array.from({ length: state.wordLength }, (_, index) => {
+                  const letter = rowIndex === state.revealedAnswerRow
+                    ? state.targetWord[index]
+                    : (rowIndex === state.currentRow
+                        ? state.currentGuess[index] || ''
+                        : state.guesses[rowIndex][index] || '');
+                  // Only allow clicking for previous guesses (not current row or empty)
+                  const isClickable = rowIndex < state.currentRow && state.guesses[rowIndex];
+                  return (
+                    <div
+                      key={index}
+                      className={`wordle-tile ${getTileClass(guess[index], index, rowIndex)}${rowIndex === state.currentRow && state.invalidGuess ? ' invalid' : ''} ${isClickable ? 'clickable-tile' : ''}`}
+                      style={getFlipDelay(index)}
+                      onClick={isClickable ? () => handleShowDefinition(state.guesses[rowIndex]) : undefined}
+                      title={isClickable ? `Show definition for ${state.guesses[rowIndex]}` : undefined}
+                      tabIndex={isClickable ? 0 : -1}
+                      role={isClickable ? 'button' : undefined}
+                      aria-label={isClickable ? `Show definition for ${state.guesses[rowIndex]}` : undefined}
+                    >
+                      {letter}
+                      {state.isContrastMode && state.evaluations[rowIndex] && state.revealedLetters[rowIndex][index] && (
+                        <div className="contrast-icon">
+                          {state.evaluations[rowIndex][index] === 'correct' && (
+                            <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                              <path d="M0 0h24v24H0V0z" fill="none"/>
+                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                            </svg>
+                          )}
+                          {state.evaluations[rowIndex][index] === 'wrong-position' && (
+                            <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                              <path d="M0 0h24v24H0V0z" fill="none"/>
+                              <path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/>
+                            </svg>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 {/* rowScores display removed */}
               </div>
             );
@@ -767,7 +752,7 @@ const Wordle = ({ onBackToMenu }) => {
         </div>
         {state.showClue && state.clue && (
           <div className="clue-text" style={{marginBottom: 8, color: '#1a73e8', fontStyle: 'italic'}}>
-            {state.clue} <span style={{color:'#555', fontStyle:'normal'}}>({state.wordLength} letters)</span>
+            {state.clue} <span style={{color:'#555', fontStyle:'normal'}}>({state.wordLength})</span>
           </div>
         )}
         <div className="keyboard">
