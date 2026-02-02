@@ -767,7 +767,7 @@ const Wordle = ({ onBackToMenu }) => {
         </div>
         {state.showClue && state.clue && (
           <div className="clue-text" style={{marginBottom: 8, color: '#1a73e8', fontStyle: 'italic'}}>
-            {state.clue}
+            {state.clue} <span style={{color:'#555', fontStyle:'normal'}}>({state.wordLength} letters)</span>
           </div>
         )}
         <div className="keyboard">
