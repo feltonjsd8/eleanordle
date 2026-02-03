@@ -130,8 +130,16 @@ function reducer(state, action) {
   }
 }
 
-const Wordle = ({ onBackToMenu }) => {
-  const [state, dispatch] = useReducer(reducer, initialState);
+
+const Wordle = ({ onBackToMenu, initialWordLength }) => {
+  const [state, dispatch] = useReducer(reducer, {
+    ...initialState,
+    wordLength: initialWordLength || DEFAULT_WORD_LENGTH,
+    nextWordLength: initialWordLength || DEFAULT_WORD_LENGTH,
+    guesses: Array(6).fill(''),
+    evaluations: Array(6).fill(null).map(() => Array(initialWordLength || DEFAULT_WORD_LENGTH).fill(null)),
+    revealedLetters: Array(6).fill(null).map(() => Array(initialWordLength || DEFAULT_WORD_LENGTH).fill(false)),
+  });
   const inputRef = useRef();
   const menuRef = useRef();
   // Cache for word definitions to avoid unnecessary API calls
@@ -140,8 +148,8 @@ const Wordle = ({ onBackToMenu }) => {
   const startNewGame = async (customWordLength) => {
     dispatch({ type: 'SET_IS_LOADING', isLoading: true });
     try {
-      // Use the provided word length or the nextWordLength from state
-      const wordLength = customWordLength || state.nextWordLength || DEFAULT_WORD_LENGTH;
+      // Use the provided word length, or the nextWordLength from state, or the initialWordLength prop
+      const wordLength = customWordLength || state.nextWordLength || initialWordLength || DEFAULT_WORD_LENGTH;
       const newWord = await getRandomWord(wordLength);
       dispatch({
         type: 'RESET',
@@ -165,16 +173,23 @@ const Wordle = ({ onBackToMenu }) => {
   };
 
   useEffect(() => {
-    startNewGame(DEFAULT_WORD_LENGTH);
+    startNewGame(initialWordLength || DEFAULT_WORD_LENGTH);
     // eslint-disable-next-line
   }, []);
 
-  const handleKeyPress = (key) => {
+  const handleKeyPress = async (key) => {
     if (state.gameOver) return;
 
     if (key === 'ENTER') {
       if (state.currentGuess.length !== state.wordLength) {
-        showMessage(`Word must be ${state.wordLength} letters`);
+        showMessage(`Word must be ${state.wordLength}`);
+        return;
+      }
+      // Check validity before allowing guess
+      const isValid = await isValidWord(state.currentGuess);
+      if (!isValid) {
+        dispatch({ type: 'SET_INVALID_GUESS', invalidGuess: true });
+        showMessage('Not a valid word');
         return;
       }
       submitGuess();
@@ -182,10 +197,12 @@ const Wordle = ({ onBackToMenu }) => {
       const newGuess = state.currentGuess.slice(0, -1);
       if (state.invalidGuess && newGuess.length < state.wordLength) dispatch({ type: 'SET_INVALID_GUESS', invalidGuess: false });
       dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: newGuess });
+    } else if (state.invalidGuess) {
+      // Block further typing if guess is invalid until user deletes a letter
+      return;
     } else if (state.currentGuess.length < state.wordLength) {
       if (/^[A-Z]$/.test(key)) {
         const newGuess = state.currentGuess + key;
-        if (state.invalidGuess && newGuess.length < state.wordLength) dispatch({ type: 'SET_INVALID_GUESS', invalidGuess: false });
         dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: newGuess });
       }
     }
@@ -293,10 +310,7 @@ const Wordle = ({ onBackToMenu }) => {
   };
 
   const submitGuess = async () => {
-    const isValid = await isValidWord(state.currentGuess);
-    if (!isValid) {
-      return;
-    }
+    // Assume validity already checked in handleKeyPress
     const evaluation = evaluateGuess(state.currentGuess, state.targetWord);
     // scoring removed
     const newLetterStates = { ...state.letterStates }; // Get current letter states
@@ -372,10 +386,26 @@ const Wordle = ({ onBackToMenu }) => {
     }
   };
 
+  // Ensure error messages are visible for at least 1 second
+  const messageTimeoutRef = useRef();
   const showMessage = (msg) => {
     dispatch({ type: 'SET_MESSAGE', message: msg });
-    setTimeout(() => dispatch({ type: 'SET_MESSAGE', message: '' }), 2000);
+    if (messageTimeoutRef.current) {
+      clearTimeout(messageTimeoutRef.current);
+    }
+    messageTimeoutRef.current = setTimeout(() => {
+      dispatch({ type: 'SET_MESSAGE', message: '' });
+      messageTimeoutRef.current = null;
+    }, 1000); // 1 second minimum
   };
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (messageTimeoutRef.current) {
+        clearTimeout(messageTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const getTileClass = (letter, index, rowIndex) => {
     if (rowIndex > state.currentRow) return '';
@@ -423,6 +453,7 @@ const Wordle = ({ onBackToMenu }) => {
     if (revealRow === -1) revealRow = state.guesses.length - 1;
     dispatch({ type: 'SET_REVEALED_ANSWER_ROW', revealedAnswerRow: revealRow });
     const answer = state.targetWord;
+    if (!answer || !answer.length) return;
     const evaluation = evaluateGuess(answer, state.targetWord);
     const newGuesses = [...state.guesses];
     const newEvaluations = [...state.evaluations];
@@ -707,11 +738,16 @@ const Wordle = ({ onBackToMenu }) => {
                 }}
               >
                 {Array.from({ length: state.wordLength }, (_, index) => {
-                  const letter = rowIndex === state.revealedAnswerRow
-                    ? state.targetWord[index]
-                    : (rowIndex === state.currentRow
-                        ? state.currentGuess[index] || ''
-                        : state.guesses[rowIndex][index] || '');
+                  let letter = '';
+                  if (rowIndex === state.revealedAnswerRow) {
+                    letter = (state.targetWord && typeof state.targetWord === 'string' && state.targetWord.length > index)
+                      ? state.targetWord[index]
+                      : '';
+                  } else if (rowIndex === state.currentRow) {
+                    letter = state.currentGuess[index] || '';
+                  } else {
+                    letter = state.guesses[rowIndex][index] || '';
+                  }
                   // Only allow clicking for previous guesses (not current row or empty)
                   const isClickable = rowIndex < state.currentRow && state.guesses[rowIndex];
                   return (
@@ -726,6 +762,20 @@ const Wordle = ({ onBackToMenu }) => {
                       aria-label={isClickable ? `Show definition for ${state.guesses[rowIndex]}` : undefined}
                     >
                       {letter}
+                      {/* Mark all letters in red if invalid guess on current row */}
+                      {rowIndex === state.currentRow && state.invalidGuess && letter && (
+                        <span style={{
+                          position: 'absolute',
+                          left: 0,
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          color: '#b91c1c',
+                          fontWeight: 'bold',
+                          background: 'rgba(255,0,0,0.08)',
+                          zIndex: 2
+                        }}>{letter}</span>
+                      )}
                       {state.isContrastMode && state.evaluations[rowIndex] && state.revealedLetters[rowIndex][index] && (
                         <div className="contrast-icon">
                           {state.evaluations[rowIndex][index] === 'correct' && (
@@ -750,7 +800,7 @@ const Wordle = ({ onBackToMenu }) => {
             );
           })}
         </div>
-        {state.showClue && state.clue && (
+        {state.clue && (
           <div className="clue-text" style={{marginBottom: 8, color: '#1a73e8', fontStyle: 'italic'}}>
             {state.clue} <span style={{color:'#555', fontStyle:'normal'}}>({state.wordLength})</span>
           </div>
