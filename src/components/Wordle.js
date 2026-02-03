@@ -762,19 +762,28 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
                       aria-label={isClickable ? `Show definition for ${state.guesses[rowIndex]}` : undefined}
                     >
                       {letter}
-                      {/* Mark all letters in red if invalid guess on current row */}
+                      {/* Mark all letters in red if invalid guess on current row, but only overlay if not already showing the letter */}
                       {rowIndex === state.currentRow && state.invalidGuess && letter && (
-                        <span style={{
-                          position: 'absolute',
-                          left: 0,
-                          right: 0,
-                          top: 0,
-                          bottom: 0,
-                          color: '#b91c1c',
-                          fontWeight: 'bold',
-                          background: 'rgba(255,0,0,0.08)',
-                          zIndex: 2
-                        }}>{letter}</span>
+                        <span
+                          style={{
+                            position: 'absolute',
+                            left: 0,
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            color: '#b91c1c',
+                            fontWeight: 'bold',
+                            background: 'rgba(255,0,0,0.08)',
+                            zIndex: 2,
+                            pointerEvents: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          aria-hidden="true"
+                        >
+                          {letter}
+                        </span>
                       )}
                       {state.isContrastMode && state.evaluations[rowIndex] && state.revealedLetters[rowIndex][index] && (
                         <div className="contrast-icon">
