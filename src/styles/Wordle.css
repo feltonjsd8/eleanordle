@@ -158,7 +158,7 @@
   flex-direction: row;
   gap: 5px;
   position: relative;
-  padding-left: 30px; /* Space for the icon */
+  /* padding-left: 30px;  Icon removed, so no left padding */
   align-items: center;
   flex-wrap: nowrap;
   width: 100%;
