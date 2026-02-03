@@ -519,7 +519,16 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
     }
     const { getWordFinderSuggestions } = await import('../services/suggestionService');
     const words = await getWordFinderSuggestions(correct, present, absent, wordLength, state.targetWord, wrongPosition);
-    const availableWords = words.filter(word => !state.usedSuggestions.includes(word));
+    // Filter out used suggestions
+    let availableWords = words.filter(word => !state.usedSuggestions.includes(word));
+    // Only keep words with a definition
+    const definitionChecks = await Promise.all(
+      availableWords.map(async word => {
+        const def = await getWordDefinition(word);
+        return def && def.definitions && def.definitions[0] && def.definitions[0].definition && def.definitions[0].definition !== 'Definition not available';
+      })
+    );
+    availableWords = availableWords.filter((word, idx) => definitionChecks[idx]);
     dispatch({ type: 'SET_IS_LOADING', isLoading: false });
     if (availableWords.length > 0) {
       const newSuggestion = availableWords[Math.floor(Math.random() * availableWords.length)];
@@ -528,8 +537,16 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
       dispatch({ type: 'SET_PENDING_SUGGESTION', pendingSuggestion: true });
     } else {
       dispatch({ type: 'SET_IS_LOADING', isLoading: true });
-      const newWords = await getDictionaryWords(wordLength);
-      const newAvailableWords = newWords.filter(word => !state.usedSuggestions.includes(word));
+      let newWords = await getDictionaryWords(wordLength);
+      let newAvailableWords = newWords.filter(word => !state.usedSuggestions.includes(word));
+      // Only keep words with a definition
+      const newDefinitionChecks = await Promise.all(
+        newAvailableWords.map(async word => {
+          const def = await getWordDefinition(word);
+          return def && def.definitions && def.definitions[0] && def.definitions[0].definition && def.definitions[0].definition !== 'Definition not available';
+        })
+      );
+      newAvailableWords = newAvailableWords.filter((word, idx) => newDefinitionChecks[idx]);
       dispatch({ type: 'SET_IS_LOADING', isLoading: false });
       if (newAvailableWords.length > 0) {
         const newSuggestion = newAvailableWords[Math.floor(Math.random() * newAvailableWords.length)];
