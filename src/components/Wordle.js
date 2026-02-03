@@ -739,12 +739,14 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
               >
                 {Array.from({ length: state.wordLength }, (_, index) => {
                   let letter = '';
-                  if (rowIndex === state.revealedAnswerRow) {
+                  // Always show the submitted guess for the current row, even during animation
+                  if (rowIndex === state.currentRow) {
+                    letter = state.guesses[rowIndex][index] || state.currentGuess[index] || '';
+                  } else if (rowIndex === state.revealedAnswerRow && !state.isSuccess) {
+                    // Only show the target word if the answer is being revealed and the game was not won
                     letter = (state.targetWord && typeof state.targetWord === 'string' && state.targetWord.length > index)
                       ? state.targetWord[index]
                       : '';
-                  } else if (rowIndex === state.currentRow) {
-                    letter = state.currentGuess[index] || '';
                   } else {
                     letter = state.guesses[rowIndex][index] || '';
                   }
