@@ -38,7 +38,7 @@ const initialState = {
   alwaysShowClue: true,
   wrongPositionHistory: {},
   // Track the current word length for progression
-  nextWordLength: DEFAULT_WORD_LENGTH,
+    nextWordLength: 3,
 };
 
 function reducer(state, action) {
@@ -149,7 +149,7 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
     dispatch({ type: 'SET_IS_LOADING', isLoading: true });
     try {
       // Use the provided word length, or the nextWordLength from state, or the initialWordLength prop
-      const wordLength = customWordLength || state.nextWordLength || initialWordLength || DEFAULT_WORD_LENGTH;
+      const wordLength = Math.floor(Math.random() * (MAX_WORD_LENGTH - 3 + 1)) + 3;
       const newWord = await getRandomWord(wordLength);
       dispatch({
         type: 'RESET',
@@ -264,10 +264,7 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
   const handleNextWord = async () => {
     dispatch({ type: 'SET_SHOW_MODAL', showModal: false });
     // If last game was a failure, reset to 3 letters
-    let nextLength = state.isSuccess ? state.wordLength + 1 : 3;
-    if (nextLength > MAX_WORD_LENGTH) nextLength = MAX_WORD_LENGTH;
-    dispatch({ type: 'SET_NEXT_WORD_LENGTH', nextWordLength: nextLength });
-    await startNewGame(nextLength);
+    await startNewGame();
   };
 
   const showGameEndModal = async (success, word) => {
