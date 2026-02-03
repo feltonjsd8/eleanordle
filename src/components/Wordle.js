@@ -638,8 +638,8 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
       recognizingRef.current = false;
       clearTimeout(timeoutId);
       const transcript = event.results[0][0].transcript.trim().toUpperCase().replace(/[^A-Z]/g, '');
-      if (transcript.length !== 5) {
-        showMessage('Please say a 5-letter word.');
+      if (transcript.length !== state.wordLength) {
+        showMessage(`Please say a ${state.wordLength}-letter word.`);
         return;
       }
       dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: transcript });
