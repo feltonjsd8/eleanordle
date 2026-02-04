@@ -34,7 +34,7 @@ const initialState = {
   wordDefinition: null,
   isSuccess: false,
   completedWord: '',
-  showClue: true,
+  showClue: false,
   clue: '',
   menuOpen: false,
   showDefinitionModal: false,
@@ -65,7 +65,7 @@ function reducer(state, action) {
         evaluations: Array(guessesAllowed).fill(null).map(() => Array(wordLength).fill(null)),
         revealedLetters: Array(guessesAllowed).fill(null).map(() => Array(wordLength).fill(false)),
         alwaysShowClue,
-        showClue: alwaysShowClue ? true : false,
+        showClue: false, // Clue hidden at start
         nextWordLength: state.nextWordLength,
       };
     }
@@ -171,10 +171,8 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
       try {
         const def = await getWordDefinition(newWord);
         dispatch({ type: 'SET_CLUE', clue: def.definitions[0]?.definition || 'No clue available' });
-        dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
       } catch (e) {
         dispatch({ type: 'SET_CLUE', clue: 'No clue available' });
-        dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
       }
     } catch (error) {
       console.error('Error selecting word:', error);
@@ -188,6 +186,15 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
     startNewGame(initialWordLength || DEFAULT_WORD_LENGTH);
     // eslint-disable-next-line
   }, []);
+
+  // Reveal clue after half the guesses have been made
+  useEffect(() => {
+    const guessesAllowed = getGuessesAllowed(state.wordLength);
+    const guessesUsed = state.guesses.filter(g => g && g.length === state.wordLength).length;
+    if (!state.showClue && guessesUsed >= Math.ceil(guessesAllowed / 2)) {
+      dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
+    }
+  }, [state.guesses, state.wordLength, state.showClue]);
 
   const handleKeyPress = async (key) => {
     if (state.gameOver) return;
@@ -499,11 +506,9 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
       try {
         const def = await getWordDefinition(state.targetWord);
         dispatch({ type: 'SET_CLUE', clue: def.definitions[0]?.definition || 'No clue available' });
-        dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
       } catch (error) {
         console.error('Error fetching clue:', error);
         dispatch({ type: 'SET_CLUE', clue: 'No clue available' });
-        dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
       }
     }
   }, [state.targetWord]);
@@ -837,11 +842,15 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
             );
           })}
         </div>
-        {state.clue && (
-          <div className="clue-text" style={{marginBottom: 8, color: '#1a73e8', fontStyle: 'italic'}}>
-            {state.clue} <span style={{color:'#555', fontStyle:'normal'}}>({state.wordLength})</span>
-          </div>
-        )}
+        <div className="clue-text" style={{marginBottom: 8, color: '#1a73e8', fontStyle: state.showClue ? 'italic' : 'normal'}}>
+          {state.showClue && state.clue ? (
+            <>
+              {state.clue} <span style={{color:'#555', fontStyle:'normal'}}>({state.wordLength})</span>
+            </>
+          ) : (
+            <span style={{color:'#555', fontStyle:'normal'}}>({state.wordLength})</span>
+          )}
+        </div>
         <div className="keyboard">
           {[
             'QWERTYUIOP',
