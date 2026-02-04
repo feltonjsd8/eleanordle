@@ -8,8 +8,18 @@ import Logo from './Logo';
 
 const DEFAULT_WORD_LENGTH = 3;
 const MAX_WORD_LENGTH = 10;
+// Returns allowed guesses for a given word length
+function getGuessesAllowed(wordLength) {
+  if (wordLength === 10) return 8;
+  if (wordLength >= 8 && wordLength <= 9) return 7;
+  if (wordLength >= 7 && wordLength <= 8) return 6;
+  if (wordLength >= 5 && wordLength <= 6) return 5;
+  if (wordLength >= 3 && wordLength <= 4) return 4;
+  return 6; // fallback
+}
+
 const initialState = {
-  guesses: Array(6).fill(''),
+  guesses: Array(getGuessesAllowed(DEFAULT_WORD_LENGTH)).fill(''),
   currentGuess: '',
   currentRow: 0,
   targetWord: '',
@@ -17,8 +27,8 @@ const initialState = {
   gameOver: false,
   message: '',
   letterStates: {},
-  evaluations: Array(6).fill(null).map(() => Array(DEFAULT_WORD_LENGTH).fill(null)),
-  revealedLetters: Array(6).fill(null).map(() => Array(DEFAULT_WORD_LENGTH).fill(false)),
+  evaluations: Array(getGuessesAllowed(DEFAULT_WORD_LENGTH)).fill(null).map(() => Array(DEFAULT_WORD_LENGTH).fill(null)),
+  revealedLetters: Array(getGuessesAllowed(DEFAULT_WORD_LENGTH)).fill(null).map(() => Array(DEFAULT_WORD_LENGTH).fill(false)),
   isLoading: false,
   showModal: false,
   wordDefinition: null,
@@ -38,7 +48,7 @@ const initialState = {
   alwaysShowClue: true,
   wrongPositionHistory: {},
   // Track the current word length for progression
-    nextWordLength: 3,
+  nextWordLength: 3,
 };
 
 function reducer(state, action) {
@@ -46,13 +56,14 @@ function reducer(state, action) {
     case 'RESET': {
       const alwaysShowClue = state.alwaysShowClue;
       const wordLength = action.wordLength || (action.targetWord ? action.targetWord.length : DEFAULT_WORD_LENGTH);
+      const guessesAllowed = getGuessesAllowed(wordLength);
       return {
         ...initialState,
         targetWord: action.targetWord,
         wordLength,
-        guesses: Array(6).fill(''),
-        evaluations: Array(6).fill(null).map(() => Array(wordLength).fill(null)),
-        revealedLetters: Array(6).fill(null).map(() => Array(wordLength).fill(false)),
+        guesses: Array(guessesAllowed).fill(''),
+        evaluations: Array(guessesAllowed).fill(null).map(() => Array(wordLength).fill(null)),
+        revealedLetters: Array(guessesAllowed).fill(null).map(() => Array(wordLength).fill(false)),
         alwaysShowClue,
         showClue: alwaysShowClue ? true : false,
         nextWordLength: state.nextWordLength,
@@ -132,13 +143,14 @@ function reducer(state, action) {
 
 
 const Wordle = ({ onBackToMenu, initialWordLength }) => {
+  const guessesAllowed = getGuessesAllowed(initialWordLength || DEFAULT_WORD_LENGTH);
   const [state, dispatch] = useReducer(reducer, {
     ...initialState,
     wordLength: initialWordLength || DEFAULT_WORD_LENGTH,
     nextWordLength: initialWordLength || DEFAULT_WORD_LENGTH,
-    guesses: Array(6).fill(''),
-    evaluations: Array(6).fill(null).map(() => Array(initialWordLength || DEFAULT_WORD_LENGTH).fill(null)),
-    revealedLetters: Array(6).fill(null).map(() => Array(initialWordLength || DEFAULT_WORD_LENGTH).fill(false)),
+    guesses: Array(guessesAllowed).fill(''),
+    evaluations: Array(guessesAllowed).fill(null).map(() => Array(initialWordLength || DEFAULT_WORD_LENGTH).fill(null)),
+    revealedLetters: Array(guessesAllowed).fill(null).map(() => Array(initialWordLength || DEFAULT_WORD_LENGTH).fill(false)),
   });
   const inputRef = useRef();
   const menuRef = useRef();
@@ -364,7 +376,7 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
           dispatch({ type: 'SET_SHOW_MODAL', showModal: true });
         }).catch(() => {});
       }, 5 * 200 + 200);
-    } else if (state.currentRow === 5) {
+    } else if (state.currentRow === getGuessesAllowed(state.wordLength) - 1) {
       setTimeout(() => {
         dispatch({ type: 'SET_GAME_OVER', gameOver: true });
         dispatch({ type: 'SET_COMPLETED_WORD', completedWord: state.targetWord });
