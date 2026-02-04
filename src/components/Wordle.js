@@ -187,14 +187,7 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
     // eslint-disable-next-line
   }, []);
 
-  // Reveal clue after half the guesses have been made
-  useEffect(() => {
-    const guessesAllowed = getGuessesAllowed(state.wordLength);
-    const guessesUsed = state.guesses.filter(g => g && g.length === state.wordLength).length;
-    if (!state.showClue && guessesUsed >= Math.ceil(guessesAllowed / 2)) {
-      dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
-    }
-  }, [state.guesses, state.wordLength, state.showClue]);
+
 
   const handleKeyPress = async (key) => {
     if (state.gameOver) return;
@@ -842,8 +835,8 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
             );
           })}
         </div>
-        <div className="clue-text" style={{marginBottom: 8, color: '#1a73e8', fontStyle: state.showClue ? 'italic' : 'normal'}}>
-          {state.showClue && state.clue ? (
+        <div className="clue-text" style={{marginBottom: 8, color: '#1a73e8', fontStyle: 'italic'}}>
+          {state.clue ? (
             (() => {
               let clueText = state.clue;
               if (state.targetWord && typeof state.targetWord === 'string' && state.targetWord.length > 0) {
@@ -851,8 +844,16 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
                 const answerRegex = new RegExp(state.targetWord, 'gi');
                 clueText = clueText.replace(answerRegex, '*'.repeat(state.targetWord.length));
               }
+              // Progressive reveal: show more words with each guess, slower for short clues
+              const guessesUsed = state.guesses.filter(g => g && g.length === state.wordLength).length;
+              const words = clueText.split(' ');
+              let wordsPerGuess = 3;
+              if (words.length <= 8) wordsPerGuess = 2;
+              else if (words.length > 15) wordsPerGuess = 4;
+              const revealCount = Math.min(words.length, guessesUsed * wordsPerGuess);
+              const shown = words.slice(0, revealCount).join(' ');
               return <>
-                {clueText} <span style={{color:'#555', fontStyle:'normal'}}>({state.wordLength})</span>
+                {shown || '...'} <span style={{color:'#555', fontStyle:'normal'}}>({state.wordLength})</span>
               </>;
             })()
           ) : (
