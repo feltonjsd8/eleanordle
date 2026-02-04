@@ -844,9 +844,17 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
         </div>
         <div className="clue-text" style={{marginBottom: 8, color: '#1a73e8', fontStyle: state.showClue ? 'italic' : 'normal'}}>
           {state.showClue && state.clue ? (
-            <>
-              {state.clue} <span style={{color:'#555', fontStyle:'normal'}}>({state.wordLength})</span>
-            </>
+            (() => {
+              let clueText = state.clue;
+              if (state.targetWord && typeof state.targetWord === 'string' && state.targetWord.length > 0) {
+                // Replace all case-insensitive occurrences of the answer with asterisks
+                const answerRegex = new RegExp(state.targetWord, 'gi');
+                clueText = clueText.replace(answerRegex, '*'.repeat(state.targetWord.length));
+              }
+              return <>
+                {clueText} <span style={{color:'#555', fontStyle:'normal'}}>({state.wordLength})</span>
+              </>;
+            })()
           ) : (
             <span style={{color:'#555', fontStyle:'normal'}}>({state.wordLength})</span>
           )}
