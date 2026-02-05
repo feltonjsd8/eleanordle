@@ -568,6 +568,15 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
         let newWords = await getDictionaryWords(wordLength);
         // Candidate pool: exclude used and target
         let candidates = newWords.filter(w => !state.usedSuggestions.includes(w) && w !== state.targetWord);
+        // Exclude any candidate that places a letter in a forbidden (wrong) position
+        candidates = candidates.filter(w => {
+          const wl = w.toUpperCase();
+          for (const item of wrongPosition) {
+            const [letter, pos] = item.split('-');
+            if (wl[parseInt(pos, 10)] === letter) return false;
+          }
+          return true;
+        });
         // Score function: reward correct-position matches and presence of present letters,
         // penalize absent letters and wrong placements. Higher score preferred.
         const scoreWord = (word) => {
