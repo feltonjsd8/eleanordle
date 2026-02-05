@@ -538,6 +538,25 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
         if (checks >= maxChecks) break;
         checks++;
         if (state.usedSuggestions.includes(word)) continue;
+        const wl = word.toUpperCase();
+        // enforce correct-position letters
+        let skip = false;
+        for (let i = 0; i < state.wordLength; i++) {
+          if (correct[i] && wl[i] !== correct[i]) {
+            skip = true;
+            break;
+          }
+        }
+        if (skip) continue;
+        // enforce no letters in forbidden positions
+        for (const item of wrongPosition) {
+          const [letter, pos] = item.split('-');
+          if (wl[parseInt(pos, 10)] === letter) {
+            skip = true;
+            break;
+          }
+        }
+        if (skip) continue;
         let def = definitionCache.current[word];
         if (!def) {
           try {
