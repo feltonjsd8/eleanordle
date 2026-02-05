@@ -87,10 +87,12 @@ export async function getSuggestions(currentGuess, letterStates, evaluations, wo
  * @param {string} targetWord - The word to match letter set.
  * @returns {Promise<string[]>}
  */
-export async function getDatamuseSuggestions(targetWord, wordLength = 5) {
+export async function getDatamuseSuggestions(targetWord, wordLength = 5, correct = null) {
   const uniqueLetters = Array.from(new Set(targetWord.toLowerCase().split('')));
   const allowed = new Set(uniqueLetters);
-  const pattern = '?'.repeat(wordLength);
+  const pattern = Array.isArray(correct) && correct.length === wordLength
+    ? correct.map(l => (l ? l.toLowerCase() : '?')).join('')
+    : '?'.repeat(wordLength);
   const url = `https://api.datamuse.com/words?sp=${pattern}&max=1000`;
   try {
     const resp = await fetch(url);
@@ -115,7 +117,9 @@ export async function getDatamuseSuggestions(targetWord, wordLength = 5) {
  * @returns {Promise<string[]>}
  */
 export async function getDatamuseValidSuggestions(correct, present, wordLength = 5) {
-  const pattern = '?'.repeat(wordLength);
+  const pattern = Array.isArray(correct) && correct.length === wordLength
+    ? correct.map(l => (l ? l.toLowerCase() : '?')).join('')
+    : '?'.repeat(wordLength);
   const url = `https://api.datamuse.com/words?sp=${pattern}&max=1000`;
   try {
     const resp = await fetch(url);
@@ -145,7 +149,25 @@ export async function getDatamuseValidSuggestions(correct, present, wordLength =
  * @param {Set<string>} absent - Set of letters that must NOT be present in the word.
  * @returns {Promise<string[]>}
  */
-export async function getWordFinderSuggestions(correct, present, absent = new Set(), wordLength = 5, targetWord, wrongPosition = new Set()) {
+export async function getWordFinderSuggestions(correct, present, absent = new Set(), wordLengthOrTarget, targetWordOrWrongPosition, wrongPositionParam = new Set()) {
+  // Normalize parameters to support both old and new call signatures:
+  // - new: (correct, present, absent, wordLength, targetWord, wrongPosition)
+  // - old: (correct, present, absent, targetWord, wrongPosition)
+  let wordLength = 5;
+  let targetWord = undefined;
+  let wrongPosition = new Set();
+
+  if (typeof wordLengthOrTarget === 'number') {
+    wordLength = wordLengthOrTarget;
+    targetWord = targetWordOrWrongPosition;
+    wrongPosition = wrongPositionParam || new Set();
+  } else {
+    // legacy/alternate signature where wordLength omitted
+    targetWord = wordLengthOrTarget;
+    wrongPosition = targetWordOrWrongPosition || new Set();
+    if (Array.isArray(correct) && correct.length > 0) wordLength = correct.length;
+  }
+
   // Build the 'spelled-like' pattern for Datamuse, e.g., 'a?p?l' or '?????'
   const pattern = Array.isArray(correct) && correct.length > 0
     ? correct.map(l => (l ? l.toLowerCase() : '?')).join('')
@@ -181,6 +203,44 @@ export async function getWordFinderSuggestions(correct, present, absent = new Se
     }
   } catch (e) {
     console.error('Error fetching suggestions from Datamuse:', e);
+  }
+
+  // If Datamuse returned nothing after applying stricter client-side filters,
+  // try a pattern-only Datamuse request that matches known correct positions
+  // (e.g. 'ter???' for a 6-letter word when correct = ['T','E','R',null,null,null]).
+  if ((!suggestions || suggestions.length === 0) && Array.isArray(correct)) {
+    try {
+      const patternOnly = correct.map(l => (l ? l.toLowerCase() : '?')).join('');
+      const url2 = `https://api.datamuse.com/words?sp=${patternOnly}&max=1000`;
+      const resp2 = await fetch(url2);
+      if (resp2.ok) {
+        const data2 = await resp2.json();
+        const patternResults = data2
+          .map(w => w.word.toUpperCase())
+          .filter(word => word.length === wordLength && /^[A-Z]+$/.test(word) && word !== targetWord)
+          .filter(word => {
+            // Exclude words containing absent letters
+            for (const letter of absent) {
+              if (word.includes(letter)) return false;
+            }
+            // Ensure present letters are included
+            for (const letter of present) {
+              if (!word.includes(letter)) return false;
+            }
+            // Exclude words that place letters in known-wrong positions
+            for (const item of wrongPosition) {
+              const [letter, position] = item.split('-');
+              if (word[parseInt(position, 10)] === letter) return false;
+            }
+            return true;
+          });
+        if (patternResults && patternResults.length > 0) {
+          suggestions = patternResults;
+        }
+      }
+    } catch (e) {
+      // ignore pattern-only fallback errors
+    }
   }
 
   // Fallback: use local dictionary if Datamuse fails or returns too few results

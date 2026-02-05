@@ -528,18 +528,15 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
       }
     }
       const { getWordFinderSuggestions } = await import('../services/suggestionService');
-      const words = await getWordFinderSuggestions(correct, present, absent, wordLength, state.targetWord, wrongPosition);
-      // Try candidates but limit how many definition checks we perform and use the local cache
-      const maxChecks = 50; // avoid checking more than this many words
-      const needed = 1; // number of valid suggestions to gather before stopping
-      let checks = 0;
-      let availableWords = [];
+        // Use only confirmed correct-position letters for the Datamuse pattern
+        const patternLetters = correct.slice();
+        const words = await getWordFinderSuggestions(patternLetters, present, absent, wordLength, state.targetWord, wrongPosition);
+      // Collect candidates that satisfy position/forbidden constraints first
+      const candidateLimit = 200;
+      const candidates = [];
       for (const word of words) {
-        if (checks >= maxChecks) break;
-        checks++;
         if (state.usedSuggestions.includes(word)) continue;
         const wl = word.toUpperCase();
-        // enforce correct-position letters
         let skip = false;
         for (let i = 0; i < state.wordLength; i++) {
           if (correct[i] && wl[i] !== correct[i]) {
@@ -548,7 +545,6 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
           }
         }
         if (skip) continue;
-        // enforce no letters in forbidden positions
         for (const item of wrongPosition) {
           const [letter, pos] = item.split('-');
           if (wl[parseInt(pos, 10)] === letter) {
@@ -557,21 +553,46 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
           }
         }
         if (skip) continue;
+        candidates.push(word);
+        if (candidates.length >= candidateLimit) break;
+      }
+
+      // Prefer candidates with valid definitions (use cache first), but don't fail if none have definitions
+      const maxChecks = 50; // avoid checking more than this many words
+      const needed = 1; // number of valid suggestions to gather before stopping
+      let checks = 0;
+      const availableWords = [];
+      const uncached = [];
+      for (const word of candidates) {
         let def = definitionCache.current[word];
-        if (!def) {
-          try {
-            def = await getWordDefinition(word);
-            definitionCache.current[word] = def;
-          } catch (e) {
-            continue;
+        if (def) {
+          const hasDef = def && def.definitions && def.definitions[0] && def.definitions[0].definition && def.definitions[0].definition !== 'Definition not available';
+          if (hasDef) {
+            availableWords.push(word);
+            if (availableWords.length >= needed) break;
           }
-        }
-        const hasDef = def && def.definitions && def.definitions[0] && def.definitions[0].definition && def.definitions[0].definition !== 'Definition not available';
-        if (hasDef) {
-          availableWords.push(word);
-          if (availableWords.length >= needed) break;
+        } else {
+          uncached.push(word);
         }
       }
+
+      // Check uncached candidates up to maxChecks
+      for (const word of uncached) {
+        if (checks >= maxChecks || availableWords.length >= needed) break;
+        checks++;
+        try {
+          const def = await getWordDefinition(word);
+          definitionCache.current[word] = def;
+          const hasDef = def && def.definitions && def.definitions[0] && def.definitions[0].definition && def.definitions[0].definition !== 'Definition not available';
+          if (hasDef) {
+            availableWords.push(word);
+            if (availableWords.length >= needed) break;
+          }
+        } catch (e) {
+          // ignore definition errors for now
+        }
+      }
+
       dispatch({ type: 'SET_IS_LOADING', isLoading: false });
       if (availableWords.length > 0) {
         const newSuggestion = availableWords[Math.floor(Math.random() * availableWords.length)];
@@ -581,10 +602,29 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
         return;
       }
 
+      // If we didn't find any candidates with definitions, but there are candidates, use them (without confirmed definition)
+      if (candidates.length > 0) {
+        const newSuggestion = candidates[Math.floor(Math.random() * candidates.length)];
+        dispatch({ type: 'SET_USED_SUGGESTIONS', usedSuggestions: [...state.usedSuggestions, newSuggestion] });
+        dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: newSuggestion });
+        dispatch({ type: 'SET_PENDING_SUGGESTION', pendingSuggestion: true });
+        return;
+      }
+
       // Fallback: prefer words that maximize reuse of known letters (scored)
       dispatch({ type: 'SET_IS_LOADING', isLoading: true });
       try {
-        let newWords = await getDictionaryWords(wordLength);
+        // Always try Datamuse again using the known-position pattern before using the local dictionary
+        const { getDatamuseValidSuggestions } = await import('../services/suggestionService');
+        let newWords = [];
+        try {
+          const dm = await getDatamuseValidSuggestions(patternLetters, present, wordLength);
+          if (dm && dm.length > 0) newWords = dm.map(w => w.toUpperCase());
+        } catch (e) {
+          newWords = [];
+        }
+        // If Datamuse returned nothing, fallback to local dictionary
+        if (!newWords || newWords.length === 0) newWords = await getDictionaryWords(wordLength);
         // Candidate pool: exclude used and target
         let candidates = newWords.filter(w => !state.usedSuggestions.includes(w) && w !== state.targetWord);
         // Exclude any candidate that places a letter in a forbidden (wrong) position
@@ -630,29 +670,62 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
         const topCandidates = scored.slice(0, 200).map(x => x.w); // cap to 200 then limit definition checks
 
         checks = 0;
-        const newAvailableWords = [];
+        const candidates2 = [];
         for (const word of topCandidates) {
-          if (checks >= maxChecks) break;
-          checks++;
-          let def = definitionCache.current[word];
-          if (!def) {
-            try {
-              def = await getWordDefinition(word);
-              definitionCache.current[word] = def;
-            } catch (e) {
-              continue;
+          const wl = word.toUpperCase();
+          let skipWord = false;
+          for (let i = 0; i < state.wordLength; i++) {
+            if (correct[i] && wl[i] !== correct[i]) {
+              skipWord = true;
+              break;
             }
           }
-          const hasDef = def && def.definitions && def.definitions[0] && def.definitions[0].definition && def.definitions[0].definition !== 'Definition not available';
-          if (hasDef) {
-            newAvailableWords.push(word);
-            if (newAvailableWords.length >= needed) break;
+          if (skipWord) continue;
+          for (const item of wrongPosition) {
+            const [letter, pos] = item.split('-');
+            if (wl[parseInt(pos, 10)] === letter) {
+              skipWord = true;
+              break;
+            }
+          }
+          if (skipWord) continue;
+          candidates2.push(word);
+          if (candidates2.length >= 200) break;
+        }
+
+        const newAvailableWords = [];
+        const uncached2 = [];
+        for (const word of candidates2) {
+          const def = definitionCache.current[word];
+          if (def) {
+            const hasDef = def && def.definitions && def.definitions[0] && def.definitions[0].definition && def.definitions[0].definition !== 'Definition not available';
+            if (hasDef) newAvailableWords.push(word);
+          } else {
+            uncached2.push(word);
+          }
+        }
+
+        for (const word of uncached2) {
+          if (checks >= maxChecks || newAvailableWords.length >= needed) break;
+          checks++;
+          try {
+            const def = await getWordDefinition(word);
+            definitionCache.current[word] = def;
+            const hasDef = def && def.definitions && def.definitions[0] && def.definitions[0].definition && def.definitions[0].definition !== 'Definition not available';
+            if (hasDef) newAvailableWords.push(word);
+          } catch (e) {
+            // ignore
           }
         }
 
         dispatch({ type: 'SET_IS_LOADING', isLoading: false });
         if (newAvailableWords.length > 0) {
           const newSuggestion = newAvailableWords[Math.floor(Math.random() * newAvailableWords.length)];
+          dispatch({ type: 'SET_USED_SUGGESTIONS', usedSuggestions: [...state.usedSuggestions, newSuggestion] });
+          dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: newSuggestion });
+          dispatch({ type: 'SET_PENDING_SUGGESTION', pendingSuggestion: true });
+        } else if (candidates2.length > 0) {
+          const newSuggestion = candidates2[Math.floor(Math.random() * candidates2.length)];
           dispatch({ type: 'SET_USED_SUGGESTIONS', usedSuggestions: [...state.usedSuggestions, newSuggestion] });
           dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: newSuggestion });
           dispatch({ type: 'SET_PENDING_SUGGESTION', pendingSuggestion: true });
