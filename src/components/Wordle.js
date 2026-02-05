@@ -852,8 +852,9 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
               else if (words.length > 15) wordsPerGuess = 4;
               const revealCount = Math.min(words.length, guessesUsed * wordsPerGuess);
               const shown = words.slice(0, revealCount).join(' ');
+              const hasMore = revealCount < words.length;
               return <>
-                {shown || '...'} <span style={{color:'#555', fontStyle:'normal'}}>({state.wordLength})</span>
+                {shown || '...'}{hasMore && shown ? '...' : ''} <span style={{color:'#555', fontStyle:'normal'}}>({state.wordLength})</span>
               </>;
             })()
           ) : (
