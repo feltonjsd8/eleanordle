@@ -97,7 +97,7 @@ export const getDictionaryWords = async (category) => {
             exclude: []
         };
         
-        const response = await fetch(`${DATAMUSE_API_URL}?${config.query}&max=100&md=f`);
+        const response = await fetch(`${DATAMUSE_API_URL}?${config.query}&max=1000&md=f`);
         const words = await response.json();
         
         // Apply strict filtering

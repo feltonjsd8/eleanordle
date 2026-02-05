@@ -29,7 +29,7 @@ export async function getSuggestions(currentGuess, letterStates, evaluations, wo
 
   // Use Datamuse API to fetch suggestions for the correct word length
   const pattern = correct.map(l => (l ? l.toLowerCase() : '?')).join('');
-  const url = `https://api.datamuse.com/words?sp=${pattern || '?'.repeat(wordLength)}&max=100`;
+  const url = `https://api.datamuse.com/words?sp=${pattern || '?'.repeat(wordLength)}&max=1000`;
   let suggestions = [];
   try {
     const resp = await fetch(url);
@@ -93,7 +93,7 @@ export async function getDatamuseSuggestions(targetWord, wordLength = 5, correct
   const pattern = Array.isArray(correct) && correct.length === wordLength
     ? correct.map(l => (l ? l.toLowerCase() : '?')).join('')
     : '?'.repeat(wordLength);
-  const url = `https://api.datamuse.com/words?sp=${pattern}&max=100`;
+  const url = `https://api.datamuse.com/words?sp=${pattern}&max=1000`;
   try {
     const resp = await fetch(url);
     const data = await resp.json();
@@ -120,7 +120,7 @@ export async function getDatamuseValidSuggestions(correct, present, wordLength =
   const pattern = Array.isArray(correct) && correct.length === wordLength
     ? correct.map(l => (l ? l.toLowerCase() : '?')).join('')
     : '?'.repeat(wordLength);
-  const url = `https://api.datamuse.com/words?sp=${pattern}&max=100`;
+  const url = `https://api.datamuse.com/words?sp=${pattern}&max=1000`;
   try {
     const resp = await fetch(url);
     const data = await resp.json();
@@ -172,7 +172,7 @@ export async function getWordFinderSuggestions(correct, present, absent = new Se
   const pattern = Array.isArray(correct) && correct.length > 0
     ? correct.map(l => (l ? l.toLowerCase() : '?')).join('')
     : '?'.repeat(wordLength);
-  const url = `https://api.datamuse.com/words?sp=${pattern}&max=100`;
+  const url = `https://api.datamuse.com/words?sp=${pattern}&max=1000`;
 
   let suggestions = [];
   try {
@@ -211,7 +211,7 @@ export async function getWordFinderSuggestions(correct, present, absent = new Se
   if ((!suggestions || suggestions.length === 0) && Array.isArray(correct)) {
     try {
       const patternOnly = correct.map(l => (l ? l.toLowerCase() : '?')).join('');
-      const url2 = `https://api.datamuse.com/words?sp=${patternOnly}&max=100`;
+      const url2 = `https://api.datamuse.com/words?sp=${patternOnly}&max=1000`;
       const resp2 = await fetch(url2);
       if (resp2.ok) {
         const data2 = await resp2.json();
