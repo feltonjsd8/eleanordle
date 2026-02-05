@@ -562,21 +562,50 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
         return;
       }
 
-      // Fallback: sample the dictionary but limit checks and use cache
+      // Fallback: prefer words that maximize reuse of known letters (scored)
       dispatch({ type: 'SET_IS_LOADING', isLoading: true });
       try {
         let newWords = await getDictionaryWords(wordLength);
-        // Shuffle to avoid always checking same prefix
-        for (let i = newWords.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [newWords[i], newWords[j]] = [newWords[j], newWords[i]];
-        }
+        // Candidate pool: exclude used and target
+        let candidates = newWords.filter(w => !state.usedSuggestions.includes(w) && w !== state.targetWord);
+        // Score function: reward correct-position matches and presence of present letters,
+        // penalize absent letters and wrong placements. Higher score preferred.
+        const scoreWord = (word) => {
+          let score = 0;
+          const wl = word.toUpperCase();
+          const seen = new Set();
+          for (let i = 0; i < wordLength; i++) {
+            const c = correct[i];
+            if (c && wl[i] === c) score += 5; // strong reward for correct-position
+          }
+          for (const p of present) {
+            if (wl.includes(p)) {
+              if (!seen.has(p)) {
+                score += 3; // reward for including present letters
+                seen.add(p);
+              }
+            }
+          }
+          for (const a of absent) {
+            if (wl.includes(a)) score -= 2; // penalize absent letters
+          }
+          for (const item of wrongPosition) {
+            const [letter, pos] = item.split('-');
+            if (wl[parseInt(pos)] === letter) score -= 1; // slight penalty for repeating wrong position
+          }
+          return score;
+        };
+
+        // Score and sort candidates, keep top N to limit definition checks
+        const scored = candidates.map(w => ({ w, s: scoreWord(w) }));
+        scored.sort((a, b) => b.s - a.s);
+        const topCandidates = scored.slice(0, 200).map(x => x.w); // cap to 200 then limit definition checks
+
         checks = 0;
         const newAvailableWords = [];
-        for (const word of newWords) {
+        for (const word of topCandidates) {
           if (checks >= maxChecks) break;
           checks++;
-          if (state.usedSuggestions.includes(word)) continue;
           let def = definitionCache.current[word];
           if (!def) {
             try {
@@ -592,6 +621,7 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
             if (newAvailableWords.length >= needed) break;
           }
         }
+
         dispatch({ type: 'SET_IS_LOADING', isLoading: false });
         if (newAvailableWords.length > 0) {
           const newSuggestion = newAvailableWords[Math.floor(Math.random() * newAvailableWords.length)];
