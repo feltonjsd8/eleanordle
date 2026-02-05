@@ -527,46 +527,84 @@ const Wordle = ({ onBackToMenu, initialWordLength }) => {
         } else if (evalRow[i] === 'incorrect') absent.add(letter);
       }
     }
-    const { getWordFinderSuggestions } = await import('../services/suggestionService');
-    const words = await getWordFinderSuggestions(correct, present, absent, wordLength, state.targetWord, wrongPosition);
-    // Filter out used suggestions
-    let availableWords = words.filter(word => !state.usedSuggestions.includes(word));
-    // Only keep words with a definition
-    const definitionChecks = await Promise.all(
-      availableWords.map(async word => {
-        const def = await getWordDefinition(word);
-        return def && def.definitions && def.definitions[0] && def.definitions[0].definition && def.definitions[0].definition !== 'Definition not available';
-      })
-    );
-    availableWords = availableWords.filter((word, idx) => definitionChecks[idx]);
-    dispatch({ type: 'SET_IS_LOADING', isLoading: false });
-    if (availableWords.length > 0) {
-      const newSuggestion = availableWords[Math.floor(Math.random() * availableWords.length)];
-      dispatch({ type: 'SET_USED_SUGGESTIONS', usedSuggestions: [...state.usedSuggestions, newSuggestion] });
-      dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: newSuggestion });
-      dispatch({ type: 'SET_PENDING_SUGGESTION', pendingSuggestion: true });
-    } else {
-      dispatch({ type: 'SET_IS_LOADING', isLoading: true });
-      let newWords = await getDictionaryWords(wordLength);
-      let newAvailableWords = newWords.filter(word => !state.usedSuggestions.includes(word));
-      // Only keep words with a definition
-      const newDefinitionChecks = await Promise.all(
-        newAvailableWords.map(async word => {
-          const def = await getWordDefinition(word);
-          return def && def.definitions && def.definitions[0] && def.definitions[0].definition && def.definitions[0].definition !== 'Definition not available';
-        })
-      );
-      newAvailableWords = newAvailableWords.filter((word, idx) => newDefinitionChecks[idx]);
+      const { getWordFinderSuggestions } = await import('../services/suggestionService');
+      const words = await getWordFinderSuggestions(correct, present, absent, wordLength, state.targetWord, wrongPosition);
+      // Try candidates but limit how many definition checks we perform and use the local cache
+      const maxChecks = 50; // avoid checking more than this many words
+      const needed = 1; // number of valid suggestions to gather before stopping
+      let checks = 0;
+      let availableWords = [];
+      for (const word of words) {
+        if (checks >= maxChecks) break;
+        checks++;
+        if (state.usedSuggestions.includes(word)) continue;
+        let def = definitionCache.current[word];
+        if (!def) {
+          try {
+            def = await getWordDefinition(word);
+            definitionCache.current[word] = def;
+          } catch (e) {
+            continue;
+          }
+        }
+        const hasDef = def && def.definitions && def.definitions[0] && def.definitions[0].definition && def.definitions[0].definition !== 'Definition not available';
+        if (hasDef) {
+          availableWords.push(word);
+          if (availableWords.length >= needed) break;
+        }
+      }
       dispatch({ type: 'SET_IS_LOADING', isLoading: false });
-      if (newAvailableWords.length > 0) {
-        const newSuggestion = newAvailableWords[Math.floor(Math.random() * newAvailableWords.length)];
+      if (availableWords.length > 0) {
+        const newSuggestion = availableWords[Math.floor(Math.random() * availableWords.length)];
         dispatch({ type: 'SET_USED_SUGGESTIONS', usedSuggestions: [...state.usedSuggestions, newSuggestion] });
         dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: newSuggestion });
         dispatch({ type: 'SET_PENDING_SUGGESTION', pendingSuggestion: true });
-      } else {
+        return;
+      }
+
+      // Fallback: sample the dictionary but limit checks and use cache
+      dispatch({ type: 'SET_IS_LOADING', isLoading: true });
+      try {
+        let newWords = await getDictionaryWords(wordLength);
+        // Shuffle to avoid always checking same prefix
+        for (let i = newWords.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [newWords[i], newWords[j]] = [newWords[j], newWords[i]];
+        }
+        checks = 0;
+        const newAvailableWords = [];
+        for (const word of newWords) {
+          if (checks >= maxChecks) break;
+          checks++;
+          if (state.usedSuggestions.includes(word)) continue;
+          let def = definitionCache.current[word];
+          if (!def) {
+            try {
+              def = await getWordDefinition(word);
+              definitionCache.current[word] = def;
+            } catch (e) {
+              continue;
+            }
+          }
+          const hasDef = def && def.definitions && def.definitions[0] && def.definitions[0].definition && def.definitions[0].definition !== 'Definition not available';
+          if (hasDef) {
+            newAvailableWords.push(word);
+            if (newAvailableWords.length >= needed) break;
+          }
+        }
+        dispatch({ type: 'SET_IS_LOADING', isLoading: false });
+        if (newAvailableWords.length > 0) {
+          const newSuggestion = newAvailableWords[Math.floor(Math.random() * newAvailableWords.length)];
+          dispatch({ type: 'SET_USED_SUGGESTIONS', usedSuggestions: [...state.usedSuggestions, newSuggestion] });
+          dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: newSuggestion });
+          dispatch({ type: 'SET_PENDING_SUGGESTION', pendingSuggestion: true });
+        } else {
+          showMessage('No new suggestions found');
+        }
+      } catch (e) {
+        dispatch({ type: 'SET_IS_LOADING', isLoading: false });
         showMessage('No new suggestions found');
       }
-    }
   }, [state.evaluations, state.guesses, state.usedSuggestions, state.targetWord, state.wordLength]);
 
   useEffect(() => {
