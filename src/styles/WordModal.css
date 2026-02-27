@@ -170,3 +170,35 @@
         opacity: 1;
     }
 }
+
+/* ── Dark Mode ── */
+.wordle.dark .modal-content {
+    background-color: #1a1a1b;
+    color: #d7dadc;
+}
+
+.wordle.dark .modal-header {
+    border-bottom-color: #3a3a3c;
+}
+
+.wordle.dark .modal-body {
+    color: #d7dadc;
+}
+
+.wordle.dark .modal-footer {
+    border-top-color: #3a3a3c;
+}
+
+.wordle.dark .definitions-section {
+    border-top-color: #3a3a3c;
+}
+
+.wordle.dark .definition-item {
+    border-bottom-color: #3a3a3c;
+}
+
+.wordle.dark .phonetic,
+.wordle.dark .part-of-speech,
+.wordle.dark .example {
+    color: #818384;
+}

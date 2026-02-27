@@ -185,6 +185,10 @@
   transform-origin: center;
 }
 
+.wordle.dark .wordle-tile.flip {
+  animation: flip-dark 0.6s ease-in-out forwards;
+}
+
 @keyframes flip {
   0% {
     transform: rotateX(0deg);
@@ -197,6 +201,27 @@
     background-color: white;
     border-color: #dee2e6;
     color: black;
+  }
+  55% {
+    transform: rotateX(90deg);
+  }
+  100% {
+    transform: rotateX(0deg);
+  }
+}
+
+@keyframes flip-dark {
+  0% {
+    transform: rotateX(0deg);
+    background-color: #121213;
+    border-color: #3a3a3c;
+    color: #d7dadc;
+  }
+  45% {
+    transform: rotateX(90deg);
+    background-color: #121213;
+    border-color: #3a3a3c;
+    color: #d7dadc;
   }
   55% {
     transform: rotateX(90deg);
@@ -528,4 +553,99 @@
   height: 20px;
   margin-right: 4px;
   fill: currentColor;
+}
+
+/* ── Dark Mode ── */
+.wordle.dark {
+  background-color: #121213;
+  color: #d7dadc;
+}
+
+.wordle.dark h1,
+.wordle.dark .streak-display,
+.wordle.dark .score-display {
+  color: #d7dadc;
+}
+
+.wordle.dark .burger-bar {
+  background: #d7dadc;
+}
+
+.wordle.dark .burger-dropdown {
+  background: #1a1a1b;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+.wordle.dark .dropdown-item {
+  color: #d7dadc;
+}
+
+.wordle.dark .dropdown-item:hover {
+  background: #2c2c2e;
+}
+
+.wordle.dark .wordle-tile {
+  background: #121213;
+  border-color: #3a3a3c;
+  color: #d7dadc;
+}
+
+.wordle.dark .wordle-tile.correct {
+  background: #538d4e;
+  color: #fff;
+  border-color: #538d4e;
+}
+
+.wordle.dark .wordle-tile.wrong-position {
+  background: #b59f3b;
+  color: #fff;
+  border-color: #b59f3b;
+}
+
+.wordle.dark .wordle-tile.incorrect {
+  background: #3a3a3c;
+  color: #fff;
+  border-color: #3a3a3c;
+}
+
+.wordle.dark .key {
+  background-color: #818384;
+  color: #d7dadc;
+}
+
+.wordle.dark .key:hover {
+  background-color: #6a6a6c;
+}
+
+.wordle.dark .key.incorrect {
+  background-color: #3a3a3c;
+  color: #818384;
+}
+
+.wordle.dark .key.used {
+  background-color: #818384;
+  color: #fff;
+}
+
+.wordle.dark .key.correct {
+  background-color: #538d4e;
+  color: #fff;
+}
+
+.wordle.dark .key.wrong-position {
+  background-color: #b59f3b;
+  color: #fff;
+  border-color: #b59f3b;
+}
+
+.wordle.dark .header-icon-btn:hover:not(:disabled) {
+  background-color: #2c2c2e;
+}
+
+.wordle.dark .definition-icon-btn svg path {
+  fill: #d7dadc;
+}
+
+.wordle.dark .contrast-icon {
+  color: #d7dadc;
 }

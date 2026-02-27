@@ -32,6 +32,7 @@ const initialState = {
   pendingSuggestion: false,
   usedSuggestions: [],
   isContrastMode: false,
+  isDarkMode: localStorage.getItem('darkMode') === 'true',
   alwaysShowClue: true,
   streak: 0,
   score: 50,
@@ -113,6 +114,8 @@ function reducer(state, action) {
       return { ...state, usedSuggestions: action.usedSuggestions };
     case 'SET_IS_CONTRAST_MODE':
       return { ...state, isContrastMode: action.isContrastMode };
+    case 'SET_IS_DARK_MODE':
+      return { ...state, isDarkMode: action.isDarkMode };
     case 'SET_TARGET_WORD':
       return { ...state, targetWord: action.targetWord };
     case 'SET_ALWAYS_SHOW_CLUE':
@@ -659,7 +662,7 @@ const Wordle = ({ onBackToMenu }) => {
   };
 
   return (
-    <div className={`wordle ${state.isContrastMode ? 'contrast' : ''}`}>
+    <div className={`wordle ${state.isContrastMode ? 'contrast' : ''} ${state.isDarkMode ? 'dark' : ''}`}>
       <input
         ref={inputRef}
         type="text"
@@ -734,6 +737,11 @@ const Wordle = ({ onBackToMenu }) => {
                 <button onClick={() => { startNewGame(true); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">New Game</button>
                 <button onClick={() => { revealAnswer(); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">Reveal</button>
                 <button onClick={() => dispatch({ type: 'SET_IS_CONTRAST_MODE', isContrastMode: !state.isContrastMode })} className="dropdown-item">Contrast Mode</button>
+                <button onClick={() => {
+                  const next = !state.isDarkMode;
+                  dispatch({ type: 'SET_IS_DARK_MODE', isDarkMode: next });
+                  localStorage.setItem('darkMode', next);
+                }} className="dropdown-item">{state.isDarkMode ? 'Light Mode' : 'Dark Mode'}</button>
                 
               </div>
             )}
