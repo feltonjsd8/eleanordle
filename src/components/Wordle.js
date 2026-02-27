@@ -33,7 +33,11 @@ const initialState = {
   usedSuggestions: [],
   isContrastMode: false,
   get isDarkMode() {
-    return localStorage.getItem('darkMode') === 'true';
+    try {
+      return localStorage.getItem('darkMode') === 'true';
+    } catch (e) {
+      return false;
+    }
   },
   alwaysShowClue: true,
   streak: 0,
@@ -58,6 +62,8 @@ function reducer(state, action) {
         streak: resetStreak ? 0 : (action.keepStreak ? state.streak : 0),
         totalScore: resetStreak ? 0 : state.totalScore,
         score: 50,
+        isDarkMode: state.isDarkMode,
+        isContrastMode: state.isContrastMode,
       };
     }
     case 'DECREMENT_SCORE':
