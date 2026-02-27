@@ -32,7 +32,9 @@ const initialState = {
   pendingSuggestion: false,
   usedSuggestions: [],
   isContrastMode: false,
-  isDarkMode: localStorage.getItem('darkMode') === 'true',
+  get isDarkMode() {
+    return localStorage.getItem('darkMode') === 'true';
+  },
   alwaysShowClue: true,
   streak: 0,
   score: 50,
