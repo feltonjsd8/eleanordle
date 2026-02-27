@@ -576,76 +576,76 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
 }
 
-.wordle.dark .dropdown-item {
+.wordle.dark:not(.contrast) .dropdown-item {
   color: #d7dadc;
 }
 
-.wordle.dark .dropdown-item:hover {
+.wordle.dark:not(.contrast) .dropdown-item:hover {
   background: #2c2c2e;
 }
 
-.wordle.dark .wordle-tile {
+.wordle.dark:not(.contrast) .wordle-tile {
   background: #121213;
   border-color: #3a3a3c;
   color: #d7dadc;
 }
 
-.wordle.dark .wordle-tile.correct {
+.wordle.dark:not(.contrast) .wordle-tile.correct {
   background: #538d4e;
   color: #fff;
   border-color: #538d4e;
 }
 
-.wordle.dark .wordle-tile.wrong-position {
+.wordle.dark:not(.contrast) .wordle-tile.wrong-position {
   background: #b59f3b;
   color: #fff;
   border-color: #b59f3b;
 }
 
-.wordle.dark .wordle-tile.incorrect {
+.wordle.dark:not(.contrast) .wordle-tile.incorrect {
   background: #3a3a3c;
   color: #fff;
   border-color: #3a3a3c;
 }
 
-.wordle.dark .key {
+.wordle.dark:not(.contrast) .key {
   background-color: #818384;
   color: #d7dadc;
 }
 
-.wordle.dark .key:hover {
+.wordle.dark:not(.contrast) .key:hover {
   background-color: #6a6a6c;
 }
 
-.wordle.dark .key.incorrect {
+.wordle.dark:not(.contrast) .key.incorrect {
   background-color: #3a3a3c;
   color: #818384;
 }
 
-.wordle.dark .key.used {
+.wordle.dark:not(.contrast) .key.used {
   background-color: #818384;
   color: #fff;
 }
 
-.wordle.dark .key.correct {
+.wordle.dark:not(.contrast) .key.correct {
   background-color: #538d4e;
   color: #fff;
 }
 
-.wordle.dark .key.wrong-position {
+.wordle.dark:not(.contrast) .key.wrong-position {
   background-color: #b59f3b;
   color: #fff;
   border-color: #b59f3b;
 }
 
-.wordle.dark .header-icon-btn:hover:not(:disabled) {
+.wordle.dark:not(.contrast) .header-icon-btn:hover:not(:disabled) {
   background-color: #2c2c2e;
 }
 
-.wordle.dark .definition-icon-btn svg path {
+.wordle.dark:not(.contrast) .definition-icon-btn svg path {
   fill: #d7dadc;
 }
 
-.wordle.dark .contrast-icon {
+.wordle.dark:not(.contrast) .contrast-icon {
   color: #d7dadc;
 }
