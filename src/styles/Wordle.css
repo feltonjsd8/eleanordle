@@ -14,16 +14,12 @@
   width: 100%;
   gap: 10px;
   padding: 0 10px;
+  margin-bottom: 14px;
 }
 
 .header-content {
   grid-column: 2;
   text-align: center;
-}
-
-.score-streak-container {
-  grid-column: 1;
-  justify-self: start;
 }
 
 .header-actions {
@@ -149,18 +145,11 @@
 
 .wordle-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr) 30px; /* 5 columns for letters, 1 fixed-width column for score */
+  grid-template-columns: repeat(5, 1fr);
   gap: 5px;
   position: relative;
   padding-left: 30px; /* Space for the icon */
   align-items: center; /* Vertically align items in the row */
-}
-
-.row-score {
-  justify-self: center; /* Center the score within its grid cell */
-  margin-left: 2px;
-  font-size: 14px;
-  font-weight: bold;
 }
 
 .wordle-tile {
@@ -516,54 +505,13 @@
   fill: currentColor;
 }
 
-.score-streak-container {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-}
-
-.streak-display, .score-display {
-  display: flex;
-  align-items: center;
-  font-weight: 600;
-  font-size: 14px;
-  color: #333;
-  position: relative;
-}
-
-.streak-display.animate, .score-display.animate {
-  animation: score-bump 0.5s ease-out;
-}
-
-@keyframes score-bump {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.2);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-.streak-display svg, .score-display svg {
-  width: 20px;
-  height: 20px;
-  margin-right: 4px;
-  fill: currentColor;
-}
-
 /* ── Dark Mode ── */
 .wordle.dark {
   background-color: #121213;
   color: #d7dadc;
 }
 
-.wordle.dark h1,
-.wordle.dark .streak-display,
-.wordle.dark .score-display {
+.wordle.dark h1 {
   color: #d7dadc;
 }
 
