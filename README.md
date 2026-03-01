@@ -5,127 +5,48 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 ## Available Scripts
 
 In the project directory, you can run:
+# Start the development server
+# Eleanordle
 
-### `npm start`
+Eleanordle is a Wordle-inspired word-guessing game included in this React app. Players attempt to guess a hidden word within a limited number of tries. The game provides feedback after each guess to help narrow down the correct answer.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## How to play
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- You have 6 attempts to guess the target word.
+- Each guess must be a valid word of the same length as the target.
+- After submitting a guess, each letter will be marked:
+	- Green: correct letter in the correct position.
+	- Yellow: correct letter in the wrong position.
+	- Gray: letter not present in the word.
+- Use the feedback to refine subsequent guesses until you find the word or run out of attempts.
 
-### `npm test`
+## Game features
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- Multiple categories (themes) for target words.
+- Keyboard input and on-screen keyboard support.
+- Visual, color-coded feedback for each guess.
+- A simple modal with word definitions/clues when available.
 
-### `npm run build`
+## Running the app locally
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
-
-# Word Games
-
-A React-based collection of word games including Hangman and Wordle.
-
-## Features
-
-- Two classic word games in one application
-- 25 different categories with 5 words each
-- Category-based gameplay
-- Progress tracking
-- Clean, modern UI
-
-## Games
-
-### Hangman
-- Classic hangman gameplay
-- Category selection
-- Visual hangman display
-- Clue system
-
-### Wordle
-- Wordle-style word guessing
-- Color-coded feedback
-- Category-based words
-- Progress tracking per category
-
-## Technologies
-
-- React
-- JavaScript
-- CSS
-- HTML
-
-## Installation
+This project is a standard Create React App. From the project root:
 
 ```bash
-# Clone the repository
-git clone https://github.com/feltonjsd/word-games.git
-
-# Navigate to project directory
-cd word-games
-
-# Install dependencies
 npm install
-
-# Start the development server
 npm start
 ```
 
-## Usage
+Open http://localhost:3000 in your browser to play.
 
-Select a game from the main menu, then choose a category to begin playing. Track your progress across different categories and try to complete them all!
+## Where to look in the code
+
+- The main game components are in `src/components` (Wordle, WordModal, DefinitionModal).
+- Word and suggestion logic is in `src/services`.
 
 ## Contributing
 
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+If you'd like to add categories, words, or features, please open an issue first or submit a pull request.
 
 ## License
 
-[MIT](https://choosealicense.com/licenses/mit/)
+MIT

@@ -1,51 +1,46 @@
 import { getWordFinderSuggestions } from '../services/suggestionService';
 
-// Mock the suggestion service
-jest.mock('../services/suggestionService', () => ({
-  getWordFinderSuggestions: jest.fn(),
-}));
-
-describe('Suggestion Logic', () => {
+describe('suggestionService.getWordFinderSuggestions', () => {
   beforeEach(() => {
-    // Clear mock history before each test
-    getWordFinderSuggestions.mockClear();
+    global.fetch = jest.fn();
   });
 
-  it('should not suggest a word that has already been used', async () => {
-    const usedSuggestions = ['GRAPE'];
-    const suggestions = ['APPLE', 'LEMON', 'GRAPE'];
-    getWordFinderSuggestions.mockResolvedValue(suggestions);
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
 
-    const correct = [];
+  it('filters out the target word', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => [{ word: 'crane' }, { word: 'berry' }],
+    });
+
+    const correct = Array(5).fill(null);
     const present = new Set();
     const absent = new Set();
     const targetWord = 'BERRY';
 
-    // First call to get a suggestion
-    const firstSuggestion = 'GRAPE';
-
-    // Second call
-    const availableWords = suggestions.filter(word => !usedSuggestions.includes(word));
-    const secondSuggestions = await getWordFinderSuggestions(correct, present, absent, targetWord);
-    const secondSuggestion = secondSuggestions.filter(word => !usedSuggestions.includes(word))[0];
-
-    expect(secondSuggestion).not.toBe(firstSuggestion);
-    expect(availableWords).not.toContain(firstSuggestion);
+    const suggestions = await getWordFinderSuggestions(correct, present, absent, targetWord);
+    expect(suggestions).toContain('CRANE');
+    expect(suggestions).not.toContain('BERRY');
   });
 
-  it('should not suggest a word with a letter in the same wrong position', async () => {
-    const suggestions = ['CRANE', 'TRACE', 'GRACE'];
-    getWordFinderSuggestions.mockResolvedValue(suggestions);
+  it('filters out words placing a present letter in the same wrong position', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => [{ word: 'react' }, { word: 'crane' }, { word: 'trace' }],
+    });
 
-    const correct = [];
+    const correct = Array(5).fill(null);
     const present = new Set(['R']);
     const absent = new Set();
     const targetWord = 'TOWER';
-    const wrongPosition = new Set(['R-1']); // R was in the wrong position at index 1
+    const wrongPosition = new Set(['R-0']);
 
-    const newSuggestions = await getWordFinderSuggestions(correct, present, absent, targetWord, wrongPosition);
+    const suggestions = await getWordFinderSuggestions(correct, present, absent, targetWord, wrongPosition);
 
-    // The new suggestion should not have R at index 1
-    expect(newSuggestions.every(word => word[1] !== 'R')).toBe(true);
+    expect(suggestions).not.toContain('REACT');
+    expect(suggestions).toContain('CRANE');
+    expect(suggestions).toContain('TRACE');
   });
 });

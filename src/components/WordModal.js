@@ -1,8 +1,22 @@
 import React from 'react';
 import '../styles/WordModal.css';
 
-const WordModal = ({ isOpen, onClose, word, definition, isSuccess, onNextWord }) => {
+const WordModal = ({
+    isOpen,
+    onClose,
+    word,
+    definition,
+    isSuccess,
+    onNextWord,
+    gameMode,
+    dailyDateKey,
+    shareText,
+    onShare,
+}) => {
     if (!isOpen) return null;
+
+    const isDaily = gameMode === 'daily';
+    const primaryLabel = isDaily ? 'Close' : (isSuccess ? 'Next Word' : 'Try Again');
 
     return (
         <div className="modal-overlay">
@@ -18,6 +32,15 @@ const WordModal = ({ isOpen, onClose, word, definition, isSuccess, onNextWord })
                             <p className="phonetic">{definition.phonetic}</p>
                         )}
                     </div>
+
+                    {isDaily && shareText && (
+                        <div className="share-section">
+                            <h4 className="share-title">Share</h4>
+                            <div className="share-subtitle">Daily {dailyDateKey}</div>
+                            <pre className="share-grid" aria-label="Share grid">{shareText}</pre>
+                        </div>
+                    )}
+
                     <div className="definitions-section">
                         {definition?.definitions?.map((def, index) => (
                             <div key={index} className="definition-item">
@@ -33,15 +56,17 @@ const WordModal = ({ isOpen, onClose, word, definition, isSuccess, onNextWord })
                     </div>
                 </div>
                 <div className="modal-footer">
-                    {isSuccess ? (
-                        <button className="next-word-button" onClick={onNextWord}>
-                            Next Word
-                        </button>
-                    ) : (
-                        <button className="try-again-button" onClick={onNextWord}>
-                            Try Again
+                    {isDaily && (
+                        <button className="share-button" onClick={onShare}>
+                            Copy
                         </button>
                     )}
+                    <button
+                        className={isDaily ? 'try-again-button' : (isSuccess ? 'next-word-button' : 'try-again-button')}
+                        onClick={onNextWord}
+                    >
+                        {primaryLabel}
+                    </button>
                 </div>
             </div>
         </div>
