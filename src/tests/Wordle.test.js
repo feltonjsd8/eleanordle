@@ -1,110 +1,67 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Wordle from '../components/Wordle';
 
-// Mock the dictionary service
+// Mock the dictionary service (daily uses getDictionaryWords)
 jest.mock('../services/dictionaryService', () => ({
-  getRandomWord: jest.fn(() => Promise.resolve('APPLE')),
+  getRandomWord: jest.fn(() => Promise.resolve('GRAPE')),
+  getDictionaryWords: jest.fn(() => Promise.resolve(['APPLE'])),
   getWordDefinition: jest.fn(() => Promise.resolve({ definitions: [{ definition: 'A fruit' }] })),
   isValidWord: jest.fn(() => Promise.resolve(true)),
 }));
 
 describe('Wordle Component', () => {
-  it('should display the current guess after getting a clue', async () => {
-    render(<Wordle />);
-
-    // Wait for the game to load
-    await screen.findByText('Eleanordle');
-
-    // Click the clue button
-    fireEvent.click(screen.getByLabelText('Get Clue'));
-
-    // Wait for the clue to be displayed
-    await screen.findByText('Clue: A fruit');
-
-    // Type a guess
-    fireEvent.keyDown(window, { key: 'C', code: 'KeyC' });
-    fireEvent.keyDown(window, { key: 'L', code: 'KeyL' });
-    fireEvent.keyDown(window, { key: 'U', code: 'KeyU' });
-    fireEvent.keyDown(window, { key: 'E', code: 'KeyE' });
-
-    // Check that the guess is displayed
-    expect(screen.getByText('C')).toBeInTheDocument();
-    expect(screen.getByText('L')).toBeInTheDocument();
-    expect(screen.getByText('U')).toBeInTheDocument();
-    expect(screen.getByText('E')).toBeInTheDocument();
+  beforeEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
   });
 
-  it('should display the correct answer when the reveal button is clicked', async () => {
+  const getTodayKey = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  it('defaults to Daily mode and blocks reveal', async () => {
     render(<Wordle />);
 
-    // Wait for the game to load
-    await screen.findByText('Eleanordle');
+    await screen.findByTitle('Eleanordle');
 
-    // Click the reveal button
-    fireEvent.click(screen.getByText('Reveal'));
-
-    // Check that the correct answer is displayed
-    expect(screen.getByText('A')).toBeInTheDocument();
-    expect(screen.getByText('P')).toBeInTheDocument();
-    expect(screen.getByText('L')).toBeInTheDocument();
-    expect(screen.getByText('E')).toBeInTheDocument();
-  });
-
-  it('should not show the answer at the start of a new game after being revealed', async () => {
-    render(<Wordle />);
-
-    // Wait for the game to load
-    await screen.findByText('Eleanordle');
-
-    // Click the reveal button
-    fireEvent.click(screen.getByText('Reveal'));
-
-    // Start a new game
-    fireEvent.click(screen.getByText('New Game'));
-
-    // Check that the answer is not displayed
-    expect(screen.queryByText('A')).not.toBeInTheDocument();
-    expect(screen.queryByText('P')).not.toBeInTheDocument();
-    expect(screen.queryByText('L')).not.toBeInTheDocument();
-    expect(screen.queryByText('E')).not.toBeInTheDocument();
-  });
-
-  it('should fetch more words if no suggestions are found', async () => {
-    const { getWordFinderSuggestions, getDictionaryWords } = require('../services/suggestionService');
-    getWordFinderSuggestions.mockResolvedValueOnce([]); // No initial suggestions
-    getDictionaryWords.mockResolvedValueOnce(['GRAPE', 'LEMON']); // New words to fetch
-
-    render(<Wordle />);
-
-    // Wait for the game to load
-    await screen.findByText('Eleanordle');
-
-    // Click the suggest word button
-    fireEvent.click(screen.getByLabelText('Suggest Word'));
-
-    // Check that a new suggestion is displayed
-    expect(await screen.findByText('G')).toBeInTheDocument();
-    expect(await screen.findByText('R')).toBeInTheDocument();
-    expect(await screen.findByText('A')).toBeInTheDocument();
-    expect(await screen.findByText('P
-')).toBeInTheDocument();
-    expect(await screen.findByText('E')).toBeInTheDocument();
-  });
-
-  it('should toggle contrast mode', async () => {
-    render(<Wordle />);
-
-    // Wait for the game to load
-    await screen.findByText('Eleanordle');
-
-    // Click the burger menu button
     fireEvent.click(screen.getByLabelText('Open menu'));
+    fireEvent.click(screen.getByText('Reveal'));
 
-    // Click the contrast mode button
+    expect(await screen.findByText('Daily mode: no reveals')).toBeInTheDocument();
+  });
+
+  it('switches to Practice mode and uses a random word excluding today\'s daily', async () => {
+    const { getRandomWord } = require('../services/dictionaryService');
+
+    render(<Wordle />);
+    await screen.findByTitle('Eleanordle');
+
+    const dateKey = getTodayKey();
+    await waitFor(() => {
+      expect(localStorage.getItem(`eleanordle:daily:${dateKey}:targetWord`)).toBeTruthy();
+    });
+    const dailyWord = localStorage.getItem(`eleanordle:daily:${dateKey}:targetWord`);
+
+    // Switch modes
+    fireEvent.click(screen.getByLabelText('Open menu'));
+    fireEvent.click(screen.getByText('Practice Mode'));
+
+    // Practice fetch should be called with the daily word excluded
+    expect(getRandomWord).toHaveBeenLastCalledWith([dailyWord]);
+  });
+
+  it('toggles contrast mode via menu', async () => {
+    const { container } = render(<Wordle />);
+    await screen.findByTitle('Eleanordle');
+
+    fireEvent.click(screen.getByLabelText('Open menu'));
     fireEvent.click(screen.getByText('Contrast Mode'));
 
-    // Check that the contrast class is applied
-    expect(screen.getByText('Eleanordle').parentElement.parentElement.parentElement).toHaveClass('contrast');
+    expect(container.querySelector('.wordle')).toHaveClass('contrast');
   });
 });

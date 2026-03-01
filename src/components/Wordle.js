@@ -3,8 +3,68 @@ import '../styles/Wordle.css';
 import { getRandomWord, getWordDefinition, isValidWord, getDictionaryWords } from '../services/dictionaryService';
 import WordModal from './WordModal';
 import DefinitionModal from './DefinitionModal';
-import { getSuggestions } from '../services/suggestionService';
 import Logo from './Logo';
+
+const GAME_MODE_DAILY = 'daily';
+const GAME_MODE_PRACTICE = 'practice';
+
+const getLocalDateKey = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const hashToUint32 = (str) => {
+  // FNV-1a (32-bit)
+  let hash = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+
+const buildShareText = ({ dateKey, evaluations, isSuccess }) => {
+  const playedRows = evaluations.filter(Boolean).length;
+  const result = isSuccess ? playedRows : 'X';
+  const lines = evaluations
+    .filter(Boolean)
+    .map((row) =>
+      row
+        .map((cell) => {
+          if (cell === 'correct') return '🟩';
+          if (cell === 'wrong-position') return '🟨';
+          return '⬛';
+        })
+        .join('')
+    )
+    .join('\n');
+
+  return `Eleanordle Daily ${dateKey} ${result}/6\n\n${lines}`;
+};
+
+const computeLetterStatesFromHistory = (guesses, evaluations) => {
+  const states = {};
+  for (let r = 0; r < evaluations.length; r++) {
+    const rowEval = evaluations[r];
+    const guess = guesses[r] || '';
+    if (!rowEval) continue;
+    for (let i = 0; i < rowEval.length; i++) {
+      const letter = guess[i];
+      if (!letter) continue;
+      const newState = rowEval[i];
+      const current = states[letter];
+      if (newState === 'correct') states[letter] = 'correct';
+      else if (newState === 'wrong-position') {
+        if (current !== 'correct' && current !== 'wrong-position') states[letter] = 'wrong-position';
+      } else if (newState === 'incorrect') {
+        if (!current) states[letter] = 'incorrect';
+      }
+    }
+  }
+  return states;
+};
 
 const initialState = {
   guesses: Array(6).fill(''),
@@ -39,6 +99,8 @@ const initialState = {
           totalScore: 0,
           rowScores: Array(6).fill(null),
           wrongPositionHistory: {},
+  gameMode: GAME_MODE_DAILY,
+  dailyDateKey: getLocalDateKey(),
 animateScore: false,
 animateStreak: false,
         };;
@@ -122,6 +184,30 @@ function reducer(state, action) {
       return { ...state, alwaysShowClue: action.alwaysShowClue };
     case 'SET_ROW_SCORES':
       return { ...state, rowScores: action.rowScores };
+    case 'SET_WRONG_POSITION_HISTORY':
+      return { ...state, wrongPositionHistory: action.wrongPositionHistory };
+    case 'SET_GAME_MODE':
+      return { ...state, gameMode: action.gameMode };
+    case 'SET_DAILY_DATE_KEY':
+      return { ...state, dailyDateKey: action.dailyDateKey };
+    case 'LOAD_SAVED_GAME': {
+      // Intentionally keep user prefs (dark/contrast) and cached UI flags.
+      const preserved = {
+        isDarkMode: state.isDarkMode,
+        isContrastMode: state.isContrastMode,
+        alwaysShowClue: state.alwaysShowClue,
+      };
+      return {
+        ...state,
+        ...action.saved,
+        ...preserved,
+        showModal: false,
+        showDefinitionModal: false,
+        menuOpen: false,
+        invalidGuess: false,
+        pendingSuggestion: false,
+      };
+    }
     case 'REVEAL_LETTER': {
       // Reveal a single letter in a row
       const { rowIndex, letterIndex } = action;
@@ -149,15 +235,73 @@ const Wordle = ({ onBackToMenu }) => {
   // Cache for word definitions to avoid unnecessary API calls
   const definitionCache = useRef({});
 
-  const startNewGame = async (resetStreak = false, animate = false) => {
+  const getDailyTargetStorageKey = (dateKey) => `eleanordle:daily:${dateKey}:targetWord`;
+  const getDailyStateStorageKey = (dateKey) => `eleanordle:daily:${dateKey}:state`;
+
+  const getOrCreateDailyTargetWord = useCallback(async (dateKey) => {
+    const key = getDailyTargetStorageKey(dateKey);
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+
+    const maybeWords = await getDictionaryWords();
+    const words = Array.isArray(maybeWords) ? maybeWords : [];
+    const seed = hashToUint32(dateKey);
+    const idx = words.length ? seed % words.length : 0;
+    const word = (words[idx] || 'ERROR').toUpperCase();
+    localStorage.setItem(key, word);
+    return word;
+  }, []);
+
+  const loadDailySavedState = useCallback((dateKey) => {
+    const raw = localStorage.getItem(getDailyStateStorageKey(dateKey));
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const saveDailyState = useCallback((dateKey, nextState) => {
+    const payload = {
+      // daily identity
+      gameMode: GAME_MODE_DAILY,
+      dailyDateKey: dateKey,
+
+      // gameplay
+      guesses: nextState.guesses,
+      currentGuess: nextState.currentGuess,
+      currentRow: nextState.currentRow,
+      targetWord: nextState.targetWord,
+      gameOver: nextState.gameOver,
+      isSuccess: nextState.isSuccess,
+      completedWord: nextState.completedWord,
+      evaluations: nextState.evaluations,
+      letterStates: nextState.letterStates,
+
+      // clue (avoid extra API calls)
+      clue: nextState.clue,
+      showClue: nextState.showClue,
+
+      // Keep revealedLetters empty so we don’t replay flip animations on reload
+      revealedLetters: Array(6).fill(null).map(() => Array(5).fill(false)),
+    };
+    localStorage.setItem(getDailyStateStorageKey(dateKey), JSON.stringify(payload));
+  }, []);
+
+  const startPracticeGame = async (resetStreak = false, animate = false) => {
     if (animate) {
       dispatch({ type: 'SET_ANIMATE_SCORE', animateScore: true });
       dispatch({ type: 'SET_ANIMATE_STREAK', animateStreak: true });
     }
     dispatch({ type: 'SET_IS_LOADING', isLoading: true });
     try {
-      const newWord = await getRandomWord();
+      const todayKey = getLocalDateKey();
+      const dailyWord = localStorage.getItem(getDailyTargetStorageKey(todayKey));
+      const exclude = dailyWord ? [dailyWord] : [];
+      const newWord = await getRandomWord(exclude);
       dispatch({ type: 'RESET', targetWord: newWord, keepStreak: !resetStreak, resetStreak });
+      dispatch({ type: 'SET_GAME_MODE', gameMode: GAME_MODE_PRACTICE });
       try {
         const def = await getWordDefinition(newWord);
         dispatch({ type: 'SET_CLUE', clue: def.definitions[0]?.definition || 'No clue available' });
@@ -174,10 +318,74 @@ const Wordle = ({ onBackToMenu }) => {
     }
   };
 
+  const startDailyGame = useCallback(async (dateKey) => {
+    dispatch({ type: 'SET_IS_LOADING', isLoading: true });
+    try {
+      const normalizedDateKey = dateKey || getLocalDateKey();
+      const targetWord = await getOrCreateDailyTargetWord(normalizedDateKey);
+
+      const saved = loadDailySavedState(normalizedDateKey);
+      if (saved && saved.targetWord === targetWord) {
+        const hydrated = {
+          ...initialState,
+          ...saved,
+          targetWord,
+          gameMode: GAME_MODE_DAILY,
+          dailyDateKey: normalizedDateKey,
+          // ensure defaults for arrays if missing
+          guesses: saved.guesses || Array(6).fill(''),
+          evaluations: saved.evaluations || Array(6).fill(null),
+          revealedLetters: Array(6).fill(null).map(() => Array(5).fill(false)),
+          letterStates: saved.letterStates || computeLetterStatesFromHistory(saved.guesses || Array(6).fill(''), saved.evaluations || Array(6).fill(null)),
+        };
+        dispatch({ type: 'LOAD_SAVED_GAME', saved: hydrated });
+      } else {
+        dispatch({ type: 'RESET', targetWord, keepStreak: false, resetStreak: true });
+        dispatch({ type: 'SET_GAME_MODE', gameMode: GAME_MODE_DAILY });
+        dispatch({ type: 'SET_DAILY_DATE_KEY', dailyDateKey: normalizedDateKey });
+        try {
+          const def = await getWordDefinition(targetWord);
+          dispatch({ type: 'SET_CLUE', clue: def.definitions[0]?.definition || 'No clue available' });
+          dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
+        } catch {
+          dispatch({ type: 'SET_CLUE', clue: 'No clue available' });
+          dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
+        }
+      }
+    } catch (error) {
+      console.error('Error starting daily game:', error);
+      showMessage('Error loading daily word. Please try again.');
+    } finally {
+      dispatch({ type: 'SET_IS_LOADING', isLoading: false });
+    }
+  }, [getOrCreateDailyTargetWord, loadDailySavedState]);
+
   useEffect(() => {
-    startNewGame(false, false);
+    // Default to Daily mode on load
+    startDailyGame(getLocalDateKey());
     // eslint-disable-next-line
   }, []);
+
+  useEffect(() => {
+    if (state.gameMode !== GAME_MODE_DAILY) return;
+    // Persist after meaningful changes.
+    saveDailyState(state.dailyDateKey, state);
+  }, [
+    state.gameMode,
+    state.dailyDateKey,
+    state.guesses,
+    state.currentGuess,
+    state.currentRow,
+    state.targetWord,
+    state.gameOver,
+    state.isSuccess,
+    state.completedWord,
+    state.evaluations,
+    state.letterStates,
+    state.clue,
+    state.showClue,
+    saveDailyState,
+  ]);
 
   const handleKeyPress = (key) => {
     if (state.gameOver) return;
@@ -258,7 +466,7 @@ const Wordle = ({ onBackToMenu }) => {
     }
     dispatch({ type: 'SET_SHOW_MODAL', showModal: false });
     // Only reset streak/score if last game was a loss (not success)
-    await startNewGame(!state.isSuccess, state.isSuccess);
+    await startPracticeGame(!state.isSuccess, state.isSuccess);
   };
 
   const showGameEndModal = async (success, word) => {
@@ -418,9 +626,11 @@ const Wordle = ({ onBackToMenu }) => {
     const classes = [];
     if (rowIndex < state.currentRow) {
       const evaluation = state.evaluations[rowIndex];
-      if (evaluation && state.revealedLetters[rowIndex][index]) {
+      if (evaluation) {
+        // Always show final color for completed rows (even after reload)
         classes.push(evaluation[index]);
-        classes.push('flip');
+        // Only animate when the letter has been revealed in this session
+        if (state.revealedLetters[rowIndex][index]) classes.push('flip');
       }
     }
     if (rowIndex === state.currentRow && state.evaluations[rowIndex] && state.revealedLetters[rowIndex][index]) {
@@ -455,6 +665,11 @@ const Wordle = ({ onBackToMenu }) => {
 
   const revealAnswer = async () => {
     if (state.gameOver) return;
+    if (state.gameMode === GAME_MODE_DAILY) {
+      showMessage('Daily mode: no reveals');
+      dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
+      return;
+    }
     let revealRow = state.guesses.findIndex(g => g === '');
     if (revealRow === -1) revealRow = state.guesses.length - 1;
     dispatch({ type: 'SET_REVEALED_ANSWER_ROW', revealedAnswerRow: revealRow });
@@ -572,10 +787,15 @@ const Wordle = ({ onBackToMenu }) => {
           if (!state.showClue) getClue();
         } else if (e.key.toLowerCase() === 's') {
           e.preventDefault();
-          handleShowSuggestions();
+          if (state.gameMode !== GAME_MODE_DAILY) handleShowSuggestions();
         } else if (e.key.toLowerCase() === 'n') {
           e.preventDefault();
-          startNewGame();
+          if (state.gameMode === GAME_MODE_DAILY) {
+            localStorage.removeItem(getDailyStateStorageKey(state.dailyDateKey));
+            startDailyGame(state.dailyDateKey);
+          } else {
+            startPracticeGame(true);
+          }
         } else if (e.key.toLowerCase() === 'r') {
           e.preventDefault();
           revealAnswer();
@@ -584,7 +804,7 @@ const Wordle = ({ onBackToMenu }) => {
     };
     window.addEventListener('keydown', handleMenuShortcuts);
     return () => window.removeEventListener('keydown', handleMenuShortcuts);
-  }, [state.showClue, getClue, handleShowSuggestions]);
+  }, [state.showClue, state.gameMode, state.dailyDateKey, getClue, handleShowSuggestions, startDailyGame, startPracticeGame, revealAnswer]);
 
   useEffect(() => {
     if (state.animateStreak) {
@@ -699,18 +919,20 @@ const Wordle = ({ onBackToMenu }) => {
           <h1><Logo /></h1>
         </div>
         <div className="header-actions">
-          
-          <button
-            onClick={handleShowSuggestions}
-            className="header-icon-btn"
-            title="Suggest Word (Alt+Shift+S)"
-            aria-label="Suggest Word"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor">
-              <path d="M0 0h24v24H0V0z" fill="none"/>
-              <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-            </svg>
-          </button>
+
+          {state.gameMode !== GAME_MODE_DAILY && (
+            <button
+              onClick={handleShowSuggestions}
+              className="header-icon-btn"
+              title="Suggest Word (Alt+Shift+S)"
+              aria-label="Suggest Word"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor">
+                <path d="M0 0h24v24H0V0z" fill="none"/>
+                <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+              </svg>
+            </button>
+          )}
           <button
             onClick={handleMicInput}
             className="header-icon-btn"
@@ -734,8 +956,56 @@ const Wordle = ({ onBackToMenu }) => {
             </button>
             {state.menuOpen && (
               <div className="burger-dropdown" ref={menuRef}>
-                <button onClick={() => { startNewGame(true); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">New Game</button>
+                {state.gameMode === GAME_MODE_DAILY ? (
+                  <button
+                    onClick={() => {
+                      // Restart today’s daily (same target), clearing progress.
+                      localStorage.removeItem(getDailyStateStorageKey(state.dailyDateKey));
+                      startDailyGame(state.dailyDateKey);
+                      dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
+                    }}
+                    className="dropdown-item"
+                  >
+                    Restart Daily
+                  </button>
+                ) : (
+                  <button onClick={() => { startPracticeGame(true); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">New Game</button>
+                )}
                 <button onClick={() => { revealAnswer(); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">Reveal</button>
+
+                {state.gameMode === GAME_MODE_DAILY && state.gameOver && (
+                  <button
+                    onClick={async () => {
+                      const shareText = buildShareText({
+                        dateKey: state.dailyDateKey,
+                        evaluations: state.evaluations,
+                        isSuccess: state.isSuccess,
+                      });
+                      try {
+                        await navigator.clipboard.writeText(shareText);
+                        showMessage('Copied share grid');
+                      } catch {
+                        showMessage('Copy failed');
+                      }
+                      dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
+                    }}
+                    className="dropdown-item"
+                  >
+                    Share Result
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    const nextMode = state.gameMode === GAME_MODE_DAILY ? GAME_MODE_PRACTICE : GAME_MODE_DAILY;
+                    dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
+                    if (nextMode === GAME_MODE_DAILY) startDailyGame(getLocalDateKey());
+                    else startPracticeGame(true);
+                  }}
+                  className="dropdown-item"
+                >
+                  {state.gameMode === GAME_MODE_DAILY ? 'Practice Mode' : 'Daily Mode'}
+                </button>
                 <button onClick={() => dispatch({ type: 'SET_IS_CONTRAST_MODE', isContrastMode: !state.isContrastMode })} className="dropdown-item">Contrast Mode</button>
                 <button onClick={() => {
                   const next = !state.isDarkMode;
@@ -888,7 +1158,24 @@ const Wordle = ({ onBackToMenu }) => {
         word={state.completedWord}
         definition={state.wordDefinition}
         isSuccess={state.isSuccess}
-        onNextWord={handleNextWord}
+        onNextWord={state.gameMode === GAME_MODE_DAILY ? () => dispatch({ type: 'SET_SHOW_MODAL', showModal: false }) : handleNextWord}
+        gameMode={state.gameMode}
+        dailyDateKey={state.dailyDateKey}
+        shareText={state.gameMode === GAME_MODE_DAILY ? buildShareText({ dateKey: state.dailyDateKey, evaluations: state.evaluations, isSuccess: state.isSuccess }) : null}
+        onShare={async () => {
+          if (state.gameMode !== GAME_MODE_DAILY) return;
+          const shareText = buildShareText({
+            dateKey: state.dailyDateKey,
+            evaluations: state.evaluations,
+            isSuccess: state.isSuccess,
+          });
+          try {
+            await navigator.clipboard.writeText(shareText);
+            showMessage('Copied share grid');
+          } catch {
+            showMessage('Copy failed');
+          }
+        }}
       />
       <DefinitionModal
         isOpen={state.showDefinitionModal}

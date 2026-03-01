@@ -121,6 +121,7 @@
     border-top: 1px solid #eee;
     display: flex;
     justify-content: center;
+    gap: 10px;
 }
 
 .next-word-button,
@@ -149,6 +150,52 @@
 
 .try-again-button:hover {
     background-color: #1557b0;
+}
+
+.share-section {
+    margin: 16px 0 8px;
+    padding: 12px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.share-title {
+    margin: 0 0 4px;
+    font-size: 1rem;
+}
+
+.share-subtitle {
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+}
+
+.share-grid {
+    margin: 0;
+    padding: 10px;
+    border-radius: 6px;
+    background: #fff;
+    border: 1px solid #eee;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.9rem;
+}
+
+.share-button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    background-color: #6c757d;
+    color: white;
+}
+
+.share-button:hover {
+    background-color: #5a6268;
 }
 
 @keyframes fadeIn {
@@ -200,5 +247,20 @@
 .wordle.dark .phonetic,
 .wordle.dark .part-of-speech,
 .wordle.dark .example {
+    color: #818384;
+}
+
+.wordle.dark .share-section {
+    border-color: #3a3a3c;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.wordle.dark .share-grid {
+    background: #121213;
+    border-color: #3a3a3c;
+    color: #d7dadc;
+}
+
+.wordle.dark .share-subtitle {
     color: #818384;
 }

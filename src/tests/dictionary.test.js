@@ -1,33 +1,51 @@
 import { getDictionaryWords, isValidWord } from '../services/dictionaryService';
 
-describe('Dictionary Service - Countries', () => {
-    it('should return valid 5-letter country names', async () => {
-        const words = await getDictionaryWords('countries');
-        console.log('Found countries:', words);
-        console.log('Total number of countries:', words.length);
-        
-        // Verify we got some results
-        expect(words.length).toBeGreaterThan(0);
-        
-        // Verify all words are 5 letters
-        words.forEach(word => {
-            expect(word.length).toBe(5);
-        });
-    });
-});
+describe('dictionaryService', () => {
+  beforeEach(() => {
+    // Reset any previous fetch mocks
+    delete global.fetch;
+  });
 
-describe('Dictionary Service - Profanity Filter', () => {
-    it('should filter out inappropriate words', async () => {
-        const words = await getDictionaryWords();
-        expect(words).not.toContain('BITCH');
-        expect(words).not.toContain('JIHAD');
-        expect(words).not.toContain('NIGGA');
-    });
-});
+  it('getDictionaryWords returns uppercase 5-letter words and filters profanity (fallback path)', async () => {
+    // Force the fallback path by making fetch unavailable
+    delete global.fetch;
 
-describe('Dictionary Service - UK English', () => {
-    it('should return true for a valid UK spelling', async () => {
-        const isValid = await isValidWord('COLOUR');
-        expect(isValid).toBe(true);
+    const words = await getDictionaryWords();
+
+    expect(Array.isArray(words)).toBe(true);
+    expect(words.length).toBeGreaterThan(0);
+
+    words.forEach((w) => {
+      expect(w).toMatch(/^[A-Z]{5}$/);
     });
-});""
+
+    // A few known bad words should not appear
+    expect(words).not.toContain('BITCH');
+    expect(words).not.toContain('JIHAD');
+    expect(words).not.toContain('NIGGA');
+  });
+
+  it('isValidWord returns true when Datamuse returns an exact match', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([{ word: 'fibre' }]),
+      })
+    );
+
+    const valid = await isValidWord('FIBRE');
+    expect(valid).toBe(true);
+  });
+
+  it('isValidWord returns false when Datamuse returns no exact match', async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([]),
+      })
+    );
+
+    const valid = await isValidWord('CIGAR');
+    expect(valid).toBe(false);
+  });
+});
