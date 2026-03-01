@@ -1,6 +1,7 @@
 import React, { useReducer, useEffect, useRef, useCallback } from 'react';
 import '../styles/Wordle.css';
 import { getRandomWord, getWordDefinition, isValidWord, getDictionaryWords } from '../services/dictionaryService';
+import { loadStats, recordGameResult } from '../services/statsService';
 import WordModal from './WordModal';
 import DefinitionModal from './DefinitionModal';
 import Logo from './Logo';
@@ -109,6 +110,7 @@ const initialState = {
   dailyDateKey: getLocalDateKey(),
 animateScore: false,
 animateStreak: false,
+  stats: null,
         };;
 
 function reducer(state, action) {
@@ -231,6 +233,8 @@ function reducer(state, action) {
       return { ...state, animateScore: action.animateScore };
     case 'SET_ANIMATE_STREAK':
       return { ...state, animateStreak: action.animateStreak };
+    case 'SET_STATS':
+      return { ...state, stats: action.stats };
     default:
       return state;
   }
@@ -371,6 +375,7 @@ const Wordle = ({ onBackToMenu }) => {
   useEffect(() => {
     // Default to Daily mode on load
     startDailyGame(getLocalDateKey());
+    dispatch({ type: 'SET_STATS', stats: loadStats() });
     // eslint-disable-next-line
   }, []);
 
@@ -597,20 +602,27 @@ const Wordle = ({ onBackToMenu }) => {
     }
 
     if (state.currentGuess === state.targetWord) {
+      const winGuessCount = state.currentRow + 1;
+      const winDailyKey = state.gameMode === GAME_MODE_DAILY ? state.dailyDateKey : null;
       setTimeout(() => {
         dispatch({ type: 'SET_GAME_OVER', gameOver: true });
         dispatch({ type: 'SET_IS_SUCCESS', isSuccess: true });
         dispatch({ type: 'SET_COMPLETED_WORD', completedWord: state.targetWord });
+        const updatedStats = recordGameResult({ isSuccess: true, guessCount: winGuessCount, dailyDateKey: winDailyKey });
+        dispatch({ type: 'SET_STATS', stats: updatedStats });
         getWordDefinition(state.targetWord).then(def => {
           dispatch({ type: 'SET_WORD_DEFINITION', wordDefinition: def });
           dispatch({ type: 'SET_SHOW_MODAL', showModal: true });
         }).catch(() => {});
       }, 5 * 200 + 200);
     } else if (state.currentRow === 5) {
+      const lossDailyKey = state.gameMode === GAME_MODE_DAILY ? state.dailyDateKey : null;
       setTimeout(() => {
         dispatch({ type: 'SET_GAME_OVER', gameOver: true });
         dispatch({ type: 'SET_COMPLETED_WORD', completedWord: state.targetWord });
         dispatch({ type: 'RESET_STREAK' });
+        const updatedStats = recordGameResult({ isSuccess: false, guessCount: 6, dailyDateKey: lossDailyKey });
+        dispatch({ type: 'SET_STATS', stats: updatedStats });
         getWordDefinition(state.targetWord).then(def => {
           dispatch({ type: 'SET_WORD_DEFINITION', wordDefinition: def });
           dispatch({ type: 'SET_SHOW_MODAL', showModal: true });
@@ -1170,6 +1182,7 @@ const Wordle = ({ onBackToMenu }) => {
         gameMode={state.gameMode}
         dailyDateKey={state.dailyDateKey}
         shareText={state.gameMode === GAME_MODE_DAILY ? buildShareText({ dateKey: state.dailyDateKey, evaluations: state.evaluations, isSuccess: state.isSuccess }) : null}
+        stats={state.stats}
         onShare={async () => {
           if (state.gameMode !== GAME_MODE_DAILY) return;
           const shareText = buildShareText({
