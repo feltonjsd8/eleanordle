@@ -595,6 +595,10 @@
   background-color: #2c2c2e;
 }
 
+.wordle.dark:not(.contrast) .header-icon-btn svg {
+  fill: #ffffff;
+}
+
 .wordle.dark:not(.contrast) .definition-icon-btn svg path {
   fill: #d7dadc;
 }
