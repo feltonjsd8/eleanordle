@@ -153,8 +153,13 @@
   grid-template-columns: repeat(5, 1fr);
   gap: 5px;
   position: relative;
-  padding-left: 30px; /* Space for the icon */
   align-items: center; /* Vertically align items in the row */
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.wordle-row:hover {
+  opacity: 0.8;
 }
 
 .wordle-tile {
@@ -472,24 +477,6 @@
   }
 }
 
-.definition-icon-btn {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #000; /* Black color */
-  opacity: 1; /* Always visible */
-}
-
 .contrast-icon {
   position: absolute;
   top: 2px;
@@ -597,10 +584,6 @@
 
 .wordle.dark:not(.contrast) .header-icon-btn svg {
   fill: #ffffff;
-}
-
-.wordle.dark:not(.contrast) .definition-icon-btn svg path {
-  fill: #d7dadc;
 }
 
 .wordle.dark:not(.contrast) .contrast-icon {

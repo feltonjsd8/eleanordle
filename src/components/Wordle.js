@@ -1049,20 +1049,15 @@ const Wordle = ({ onBackToMenu }) => {
               }
             }
             return (
-              <div key={rowIndex} className="wordle-row">
-                {rowIndex < state.currentRow && state.guesses[rowIndex] && showDefinitionIcon && (
-                  <button
-                    className="definition-icon-btn"
-                    onClick={() => handleShowDefinition(state.guesses[rowIndex])}
-                    title={`View definition of ${state.guesses[rowIndex]}`}
-                    aria-label={`View definition of ${state.guesses[rowIndex]}`}
-                  >
-                    {/* Open Book icon from Wikimedia Commons, CC0 */}
-                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none">
-                      <path d="M2 6.5C2 5.12 3.12 4 4.5 4H19.5C20.88 4 22 5.12 22 6.5V19.5C22 20.33 21.33 21 20.5 21C17.46 21 14.42 20.5 12 19.5C9.58 20.5 6.54 21 3.5 21C2.67 21 2 20.33 2 19.5V6.5ZM4.5 6C4.22 6 4 6.22 4 6.5V18.5C6.97 18.5 9.97 18.03 12 17.13C14.03 18.03 17.03 18.5 20 18.5V6.5C20 6.22 19.78 6 19.5 6H4.5Z" fill="#111"/>
-                    </svg>
-                  </button>
-                )}
+              <div 
+                key={rowIndex} 
+                className="wordle-row"
+                onClick={() => {
+                  if (rowIndex < state.currentRow && state.guesses[rowIndex] && showDefinitionIcon) {
+                    handleShowDefinition(state.guesses[rowIndex]);
+                  }
+                }}
+              >
                 {Array.from({ length: 5 }, (_, index) => (
                   <div
                     key={index}
