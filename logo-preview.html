@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eleanordle Logo Ideas</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Lobster&family=Bebas+Neue&family=Pacifico&family=Raleway:wght@300;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #f0f0f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px 20px; }
+  h1 { text-align: center; color: #444; margin-bottom: 40px; font-size: 1.2em; letter-spacing: 0.05em; }
+  .ideas-grid { display: flex; flex-direction: column; gap: 40px; max-width: 700px; margin: 0 auto; }
+  .idea-card { background: white; border-radius: 16px; padding: 40px 30px 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+  .idea-label { font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.1em; color: #999; margin-bottom: 24px; }
+  .preview-area { display: flex; align-items: center; justify-content: center; min-height: 80px; background: #f9f9f9; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  .idea-desc { font-size: 0.85em; color: #777; line-height: 1.5; }
+
+  /* ── Idea 1: Wordle Tiles ── */
+  .tiles { display: flex; gap: 4px; }
+  .tile {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1em; font-weight: 700; color: white; border-radius: 4px;
+    font-family: 'Raleway', sans-serif;
+    letter-spacing: 0;
+  }
+  .tile.green  { background: #6aaa64; }
+  .tile.yellow { background: #c9b458; }
+  .tile.gray   { background: #787c7e; }
+  .tile.pink   { background: #e91e63; }
+
+  /* ── Idea 2: Gradient Flow ── */
+  .gradient-logo {
+    font-family: 'Raleway', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 3em;
+    letter-spacing: -0.02em;
+    display: inline-block;
+  }
+  .gradient-logo .grad-eleanor {
+    font-weight: 700;
+    background: linear-gradient(120deg, #e91e63 0%, #9c27b0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .gradient-logo .grad-dle {
+    font-weight: 300;
+    background: linear-gradient(120deg, #9c27b0 0%, #c9627f 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ── Idea 3: Stacked Split ── */
+  .stacked {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1;
+    gap: 0;
+  }
+  .stacked .top-word {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3.4em;
+    letter-spacing: 0.12em;
+    color: #e91e63;
+    line-height: 1;
+  }
+  .stacked .bottom-word {
+    font-family: 'Raleway', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.75em;
+    font-weight: 300;
+    letter-spacing: 0.55em;
+    text-transform: uppercase;
+    color: #9c627f;
+    padding-left: 0.55em; /* optical align for letter-spacing */
+  }
+
+  /* ── Idea 4: Neon Glow ── */
+  .neon-bg {
+    background: #1a1a2e;
+    border-radius: 10px;
+    padding: 22px 40px;
+    display: inline-block;
+  }
+  .neon-logo {
+    font-family: 'Pacifico', cursive;
+    font-size: 2.4em;
+    color: #ff4db8;
+    text-shadow:
+      0 0 4px #ff4db8,
+      0 0 10px #ff4db8,
+      0 0 25px #f50099,
+      0 0 50px #f50099;
+    letter-spacing: 0.02em;
+  }
+  .neon-logo span {
+    color: #c580ff;
+    text-shadow:
+      0 0 4px #c580ff,
+      0 0 10px #c580ff,
+      0 0 25px #9c27b0,
+      0 0 50px #9c27b0;
+  }
+
+  /* ── Idea 5: Serif Elegance ── */
+  .serif-logo {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+  }
+  .serif-logo .serif-eleanor {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 2.8em;
+    font-weight: 700;
+    color: #c2185b;
+    letter-spacing: -0.01em;
+  }
+  .serif-logo .serif-dle {
+    font-family: 'Raleway', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 1.5em;
+    font-weight: 300;
+    color: #9c627f;
+    letter-spacing: 0.05em;
+    margin-left: -2px;
+  }
+  .serif-dot {
+    width: 8px; height: 8px;
+    background: #e91e63;
+    border-radius: 50%;
+    margin-bottom: 6px;
+    margin-left: 4px;
+    display: inline-block;
+  }
+
+  /* Current (reference) */
+  .current-logo text { font-family: sans-serif; }
+</style>
+</head>
+<body>
+<h1>Eleanordle — Title Redesign Ideas</h1>
+<div class="ideas-grid">
+
+  <!-- Idea 1 -->
+  <div class="idea-card" id="idea1">
+    <div class="idea-label">Idea 1 — Wordle Tiles</div>
+    <div class="preview-area">
+      <div class="tiles">
+        <div class="tile pink">E</div>
+        <div class="tile pink">L</div>
+        <div class="tile pink">E</div>
+        <div class="tile pink">A</div>
+        <div class="tile pink">N</div>
+        <div class="tile pink">O</div>
+        <div class="tile pink">R</div>
+        <div class="tile gray">D</div>
+        <div class="tile gray">L</div>
+        <div class="tile gray">E</div>
+      </div>
+    </div>
+    <div class="idea-desc">Each letter sits in a Wordle-style tile. "Eleanor" tiles are pink, "dle" tiles fade to gray — a direct nod to the game mechanic.</div>
+  </div>
+
+  <!-- Idea 1b: coloured tiles variant -->
+  <div class="idea-card" id="idea1b">
+    <div class="idea-label">Idea 1b — Wordle Tiles (coloured)</div>
+    <div class="preview-area">
+      <div class="tiles">
+        <div class="tile green">E</div>
+        <div class="tile yellow">L</div>
+        <div class="tile green">E</div>
+        <div class="tile yellow">A</div>
+        <div class="tile green">N</div>
+        <div class="tile yellow">O</div>
+        <div class="tile green">R</div>
+        <div class="tile gray">D</div>
+        <div class="tile gray">L</div>
+        <div class="tile gray">E</div>
+      </div>
+    </div>
+    <div class="idea-desc">Same tile motif but with alternating Wordle green/yellow for "Eleanor" — feels more playful and game-like.</div>
+  </div>
+
+  <!-- Idea 2 -->
+  <div class="idea-card" id="idea2">
+    <div class="idea-label">Idea 2 — Gradient Flow</div>
+    <div class="preview-area">
+      <div class="gradient-logo"><span class="grad-eleanor">Eleanor</span><span class="grad-dle">dle</span></div>
+    </div>
+    <div class="idea-desc">A smooth pink → purple gradient across the full word. "dle" is rendered lighter to subtly merge in. Modern, bold, and polished.</div>
+  </div>
+
+  <!-- Idea 3 -->
+  <div class="idea-card" id="idea3">
+    <div class="idea-label">Idea 3 — Stacked Split</div>
+    <div class="preview-area">
+      <div class="stacked">
+        <div class="top-word">ELEANOR</div>
+        <div class="bottom-word">dle</div>
+      </div>
+    </div>
+    <div class="idea-desc">"ELEANOR" in a condensed display font dominates the top, with "dle" spaced out quietly below — giving an editorial, magazine-style feel.</div>
+  </div>
+
+  <!-- Idea 4 -->
+  <div class="idea-card" id="idea4">
+    <div class="idea-label">Idea 4 — Neon Glow</div>
+    <div class="preview-area" style="background:#1a1a2e;">
+      <div class="neon-bg" style="background:transparent; padding:0;">
+        <div class="neon-logo">Eleanor<span>dle</span></div>
+      </div>
+    </div>
+    <div class="idea-desc">A dark background with a vibrant neon-pink glow on "Eleanor" and a purple tint on "dle". Dramatic and fun — well-suited to a late-night word game vibe.</div>
+  </div>
+
+  <!-- Idea 5 -->
+  <div class="idea-card" id="idea5">
+    <div class="idea-label">Idea 5 — Serif Elegance</div>
+    <div class="preview-area">
+      <div class="serif-logo">
+        <span class="serif-eleanor">Eleanor</span><span class="serif-dle">dle</span>
+      </div>
+    </div>
+    <div class="idea-desc">"Eleanor" in a bold italic Playfair Display serif gives a classic, personal feel — as if it's signed — while "dle" in a thin sans-serif provides contrast and breathability.</div>
+  </div>
+
+</div>
+</body>
+</html>
