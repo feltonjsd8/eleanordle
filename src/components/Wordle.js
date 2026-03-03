@@ -1,6 +1,7 @@
 import React, { useReducer, useEffect, useRef, useCallback } from 'react';
 import '../styles/Wordle.css';
 import { getRandomWord, getWordDefinition, isValidWord, getDictionaryWords } from '../services/dictionaryService';
+import DAILY_WORDS from '../services/wordList';
 import { loadStats, recordGameResult } from '../services/statsService';
 import WordModal from './WordModal';
 import DefinitionModal from './DefinitionModal';
@@ -24,6 +25,16 @@ const hashToUint32 = (str) => {
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
+};
+
+const getClueForDaily = (definitions, dateKey) => {
+  // Deterministically select a definition using the date key as a seed
+  if (!definitions || definitions.length === 0) {
+    return 'No clue available';
+  }
+  const seed = hashToUint32(dateKey);
+  const idx = seed % definitions.length;
+  return definitions[idx]?.definition || 'No clue available';
 };
 
 const buildShareText = ({ dateKey, evaluations, isSuccess }) => {
@@ -248,20 +259,43 @@ const Wordle = ({ onBackToMenu }) => {
   const definitionCache = useRef({});
 
   const getDailyTargetStorageKey = (dateKey) => `eleanordle:daily:${dateKey}:targetWord`;
+  const getDailyClueStorageKey = (dateKey) => `eleanordle:daily:${dateKey}:clue`;
   const getDailyStateStorageKey = (dateKey) => `eleanordle:daily:${dateKey}:state`;
 
-  const getOrCreateDailyTargetWord = useCallback(async (dateKey) => {
+  const getOrCreateDailyTargetWord = useCallback((dateKey) => {
     const key = getDailyTargetStorageKey(dateKey);
+    const existing = localStorage.getItem(key);
+    // Only trust the cache if the word came from the static list.
+    // Old API-fetched words won't be in DAILY_WORDS and must be replaced.
+    if (existing && DAILY_WORDS.includes(existing)) return existing;
+
+    const seed = hashToUint32(dateKey);
+    const idx = seed % DAILY_WORDS.length;
+    const word = DAILY_WORDS[idx];
+    localStorage.setItem(key, word);
+    // If the word changed, clear the stale clue so it gets re-fetched
+    if (existing && existing !== word) {
+      localStorage.removeItem(getDailyClueStorageKey(dateKey));
+      localStorage.removeItem(getDailyStateStorageKey(dateKey));
+    }
+    return word;
+  }, []);
+
+  const getOrCreateDailyClue = useCallback(async (word, dateKey) => {
+    const key = getDailyClueStorageKey(dateKey);
     const existing = localStorage.getItem(key);
     if (existing) return existing;
 
-    const maybeWords = await getDictionaryWords();
-    const words = Array.isArray(maybeWords) ? maybeWords : [];
-    const seed = hashToUint32(dateKey);
-    const idx = words.length ? seed % words.length : 0;
-    const word = (words[idx] || 'ERROR').toUpperCase();
-    localStorage.setItem(key, word);
-    return word;
+    try {
+      const def = await getWordDefinition(word);
+      const clue = getClueForDaily(def.definitions, dateKey);
+      localStorage.setItem(key, clue);
+      return clue;
+    } catch (error) {
+      const fallback = 'No clue available';
+      localStorage.setItem(key, fallback);
+      return fallback;
+    }
   }, []);
 
   const loadDailySavedState = useCallback((dateKey) => {
@@ -334,7 +368,7 @@ const Wordle = ({ onBackToMenu }) => {
     dispatch({ type: 'SET_IS_LOADING', isLoading: true });
     try {
       const normalizedDateKey = dateKey || getLocalDateKey();
-      const targetWord = await getOrCreateDailyTargetWord(normalizedDateKey);
+      const targetWord = getOrCreateDailyTargetWord(normalizedDateKey);
 
       const saved = loadDailySavedState(normalizedDateKey);
       if (saved && saved.targetWord === targetWord) {
@@ -355,14 +389,9 @@ const Wordle = ({ onBackToMenu }) => {
         dispatch({ type: 'RESET', targetWord, keepStreak: false, resetStreak: true });
         dispatch({ type: 'SET_GAME_MODE', gameMode: GAME_MODE_DAILY });
         dispatch({ type: 'SET_DAILY_DATE_KEY', dailyDateKey: normalizedDateKey });
-        try {
-          const def = await getWordDefinition(targetWord);
-          dispatch({ type: 'SET_CLUE', clue: def.definitions[0]?.definition || 'No clue available' });
-          dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
-        } catch {
-          dispatch({ type: 'SET_CLUE', clue: 'No clue available' });
-          dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
-        }
+        const clue = await getOrCreateDailyClue(targetWord, normalizedDateKey);
+        dispatch({ type: 'SET_CLUE', clue });
+        dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
       }
     } catch (error) {
       console.error('Error starting daily game:', error);
@@ -370,7 +399,7 @@ const Wordle = ({ onBackToMenu }) => {
     } finally {
       dispatch({ type: 'SET_IS_LOADING', isLoading: false });
     }
-  }, [getOrCreateDailyTargetWord, loadDailySavedState]);
+  }, [getOrCreateDailyTargetWord, getOrCreateDailyClue, loadDailySavedState]);
 
   useEffect(() => {
     // Default to Daily mode on load

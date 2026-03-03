@@ -9,6 +9,17 @@ const matcher = new RegExpMatcher({
     ...englishRecommendedTransformers,
 });
 
+// Seeded random number generator (Mulberry32)
+const createSeededRandom = (seed) => {
+    return () => {
+        seed |= 0;
+        seed = (seed + 0x6d2b79f5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+};
+
 // Cache for valid words to reduce API calls
 const validWordCache = new Set();
 
@@ -140,7 +151,7 @@ export const getRandomWord = async (excludeWords = []) => {
     }
 };
 
-export const getDictionaryWords = async () => {
+export const getDictionaryWords = async (seed = null) => {
     try {
         const apiWords = new Set();
         const letterGroups = [
@@ -151,9 +162,13 @@ export const getDictionaryWords = async () => {
             'TVWXYZ'  // end consonants
         ];
 
+        // Use seeded random if a seed is provided, otherwise use Math.random
+        const rng = seed !== null ? createSeededRandom(seed) : Math.random;
+        const getRandom = typeof rng === 'function' && seed !== null ? rng : () => Math.random();
+
         // Fetch words for each letter group
         for (const group of letterGroups) {
-            const randomLetter = group[Math.floor(Math.random() * group.length)];
+            const randomLetter = group[Math.floor(getRandom() * group.length)];
             const queries = [
                 `sp=${randomLetter}????`, // exactly 5 letters, starting with our chosen letter
                 'md=f' // include frequency information
@@ -194,9 +209,9 @@ export const getDictionaryWords = async () => {
             throw new Error('No valid words found');
         }
 
-        // Shuffle the array for extra randomness
+        // Shuffle the array using seeded random if available
         for (let i = allWords.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
+            const j = Math.floor(getRandom() * (i + 1));
             [allWords[i], allWords[j]] = [allWords[j], allWords[i]];
         }
 
