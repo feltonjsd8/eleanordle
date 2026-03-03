@@ -31,11 +31,6 @@ const DefinitionModal = ({ isOpen, onClose, word, definition, micEnabled, onTogg
                     <div className="centered-close-btn">
                         <button className="modal-action-btn close-button" onClick={onClose} autoFocus>Close</button>
                     </div>
-                    <div className="centered-close-btn" style={{ marginTop: 12 }}>
-                        <button className="modal-action-btn" onClick={onToggleMic}>
-                            {micEnabled ? 'Disable Microphone' : 'Enable Microphone'}
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>
