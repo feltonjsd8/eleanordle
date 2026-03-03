@@ -991,22 +991,12 @@ const Wordle = ({ onBackToMenu }) => {
             </button>
             {state.menuOpen && (
               <div className="burger-dropdown" ref={menuRef}>
-                {state.gameMode === GAME_MODE_DAILY ? (
-                  <button
-                    onClick={() => {
-                      // Restart today’s daily (same target), clearing progress.
-                      localStorage.removeItem(getDailyStateStorageKey(state.dailyDateKey));
-                      startDailyGame(state.dailyDateKey);
-                      dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
-                    }}
-                    className="dropdown-item"
-                  >
-                    Restart Daily
-                  </button>
-                ) : (
+                {state.gameMode !== GAME_MODE_DAILY && (
                   <button onClick={() => { startPracticeGame(true); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">New Game</button>
                 )}
-                <button onClick={() => { revealAnswer(); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">Reveal</button>
+                {state.gameMode !== GAME_MODE_DAILY && (
+                  <button onClick={() => { revealAnswer(); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">Reveal</button>
+                )}
 
                 {state.gameMode === GAME_MODE_DAILY && state.gameOver && (
                   <button

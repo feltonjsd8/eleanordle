@@ -77,7 +77,6 @@ const WordModal = ({
             <div className="modal-content">
                 <div className={`modal-header ${isSuccess ? 'success' : 'failure'}`}>
                     <h2>{isSuccess ? 'Congratulations!' : 'Game Over'}</h2>
-                    <button className="close-button" onClick={onClose}>&times;</button>
                 </div>
                 <div className="modal-body">
                     <div className="word-section">

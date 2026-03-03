@@ -76,7 +76,6 @@ const SuggestionsModal = ({ isOpen, onClose, evaluations, guesses, onPickSuggest
       <div className="modal-content">
         <div className="modal-header">
           <h2>Suggested Words</h2>
-          <button className="close-button" onClick={onClose}>&times;</button>
         </div>
         <div className="modal-body">
           {loading ? <p>Loading suggestions...</p> : suggestions.length === 0 ? (

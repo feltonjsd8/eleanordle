@@ -10,7 +10,6 @@ const DefinitionModal = ({ isOpen, onClose, word, definition }) => {
             <div className="modal-content">
                 <div className="modal-header">
                     <h2>Definition</h2>
-                    <button className="close-button" onClick={onClose}>&times;</button>
                 </div>
                 <div className="modal-body">
                     <div className="word-section">
