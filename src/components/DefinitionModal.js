@@ -31,6 +31,9 @@ const DefinitionModal = ({ isOpen, onClose, word, definition }) => {
                             </div>
                         ))}
                     </div>
+                    <div style={{ textAlign: 'center', marginTop: 24 }}>
+                        <button className="modal-action-btn" onClick={onClose} autoFocus>Close</button>
+                    </div>
                 </div>
             </div>
         </div>

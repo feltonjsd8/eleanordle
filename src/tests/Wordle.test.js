@@ -24,15 +24,14 @@ describe('Wordle Component', () => {
     return `${y}-${m}-${day}`;
   };
 
-  it('defaults to Daily mode and blocks reveal', async () => {
+  it('defaults to Daily mode and hides reveal option', async () => {
     render(<Wordle />);
 
     await screen.findByTitle('Eleanordle');
 
     fireEvent.click(screen.getByLabelText('Open menu'));
-    fireEvent.click(screen.getByText('Reveal'));
-
-    expect(await screen.findByText('Daily mode: no reveals')).toBeInTheDocument();
+    expect(screen.queryByText('Reveal')).not.toBeInTheDocument();
+    expect(screen.getByText('Practice Mode')).toBeInTheDocument();
   });
 
   it('switches to Practice mode and uses a random word excluding today\'s daily', async () => {

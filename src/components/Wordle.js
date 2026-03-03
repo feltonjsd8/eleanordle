@@ -991,12 +991,6 @@ const Wordle = ({ onBackToMenu }) => {
             </button>
             {state.menuOpen && (
               <div className="burger-dropdown" ref={menuRef}>
-                {state.gameMode !== GAME_MODE_DAILY && (
-                  <button onClick={() => { startPracticeGame(true); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">New Game</button>
-                )}
-                {state.gameMode !== GAME_MODE_DAILY && (
-                  <button onClick={() => { revealAnswer(); dispatch({ type: 'SET_MENU_OPEN', menuOpen: false }); }} className="dropdown-item">Reveal</button>
-                )}
 
                 {state.gameMode === GAME_MODE_DAILY && state.gameOver && (
                   <button
@@ -1085,19 +1079,10 @@ const Wordle = ({ onBackToMenu }) => {
                   >
                     {rowIndex === state.revealedAnswerRow ? state.targetWord[index] : (rowIndex === state.currentRow ? state.currentGuess[index] || '' : state.guesses[rowIndex][index] || '')}
                     {state.isContrastMode && state.evaluations[rowIndex] && state.revealedLetters[rowIndex][index] && (
-                      <div className="contrast-icon">
-                        {state.evaluations[rowIndex][index] === 'correct' && (
-                          <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
-                            <path d="M0 0h24v24H0V0z" fill="none"/>
-                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-                          </svg>
-                        )}
-                        {state.evaluations[rowIndex][index] === 'wrong-position' && (
-                          <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
-                            <path d="M0 0h24v24H0V0z" fill="none"/>
-                            <path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/>
-                          </svg>
-                        )}
+                      <div className="contrast-icon" aria-hidden="true">
+                        {state.evaluations[rowIndex][index] === 'correct' && <span className="contrast-badge contrast-badge--correct" title="Exact match">E</span>}
+                        {state.evaluations[rowIndex][index] === 'wrong-position' && <span className="contrast-badge contrast-badge--wrong-position" title="Misplaced letter">M</span>}
+                        {state.evaluations[rowIndex][index] === 'incorrect' && <span className="contrast-badge contrast-badge--incorrect" title="Not in word">X</span>}
                       </div>
                     )}
                     
@@ -1137,19 +1122,10 @@ const Wordle = ({ onBackToMenu }) => {
                 >
                   {key}
                   {state.isContrastMode && state.letterStates[key] && (
-                    <div className="contrast-icon">
-                      {state.letterStates[key] === 'correct' && (
-                        <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
-                          <path d="M0 0h24v24H0V0z" fill="none"/>
-                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-                        </svg>
-                      )}
-                      {state.letterStates[key] === 'wrong-position' && (
-                        <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
-                          <path d="M0 0h24v24H0V0z" fill="none"/>
-                          <path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/>
-                        </svg>
-                      )}
+                    <div className="contrast-icon" aria-hidden="true">
+                      {state.letterStates[key] === 'correct' && <span className="contrast-badge contrast-badge--correct" title="Exact match">E</span>}
+                      {state.letterStates[key] === 'wrong-position' && <span className="contrast-badge contrast-badge--wrong-position" title="Misplaced letter">M</span>}
+                      {state.letterStates[key] === 'incorrect' && <span className="contrast-badge contrast-badge--incorrect" title="Not in word">X</span>}
                     </div>
                   )}
                 </button>
