@@ -114,15 +114,16 @@ const initialState = {
   alwaysShowClue: true,
   streak: 0,
   score: 50,
-          totalScore: 0,
-          rowScores: Array(6).fill(null),
-          wrongPositionHistory: {},
+  totalScore: 0,
+  rowScores: Array(6).fill(null),
+  wrongPositionHistory: {},
   gameMode: GAME_MODE_DAILY,
   dailyDateKey: getLocalDateKey(),
-animateScore: false,
-animateStreak: false,
+  animateScore: false,
+  animateStreak: false,
   stats: null,
-        };;
+  micEnabled: false,
+};
 
 function reducer(state, action) {
   switch (action.type) {
@@ -246,6 +247,8 @@ function reducer(state, action) {
       return { ...state, animateStreak: action.animateStreak };
     case 'SET_STATS':
       return { ...state, stats: action.stats };
+    case 'SET_MIC_ENABLED':
+      return { ...state, micEnabled: action.micEnabled };
     default:
       return state;
   }
@@ -954,7 +957,6 @@ const Wordle = ({ onBackToMenu }) => {
           <h1><Logo /></h1>
         </div>
         <div className="header-actions">
-
           {state.gameMode !== GAME_MODE_DAILY && (
             <button
               onClick={handleShowSuggestions}
@@ -968,17 +970,20 @@ const Wordle = ({ onBackToMenu }) => {
               </svg>
             </button>
           )}
-          <button
-            onClick={handleMicInput}
-            className="header-icon-btn"
-            title="Speak Word (Microphone)"
-            aria-label="Speak Word"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor">
-              <path d="M0 0h24v24H0V0z" fill="none"/>
-              <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3s-3 1.34-3 3v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.07 2.13 5.64 5 6.32V21h2v-2.68c2.87-.68 5-3.25 5-6.32h-2z"/>
-            </svg>
-          </button>
+          {/* Microphone button hidden unless enabled */}
+          {state.micEnabled && (
+            <button
+              onClick={handleMicInput}
+              className="header-icon-btn"
+              title="Speak Word (Microphone)"
+              aria-label="Speak Word"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor">
+                <path d="M0 0h24v24H0V0z" fill="none"/>
+                <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3s-3 1.34-3 3v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.07 2.13 5.64 5 6.32V21h2v-2.68c2.87-.68 5-3.25 5-6.32h-2z"/>
+              </svg>
+            </button>
+          )}
           <div className="burger-menu-anchor">
             <button
               className={`burger-menu-btn ${state.menuOpen ? 'open' : ''}`}
@@ -1031,6 +1036,7 @@ const Wordle = ({ onBackToMenu }) => {
                   dispatch({ type: 'SET_IS_DARK_MODE', isDarkMode: next });
                   localStorage.setItem('darkMode', next);
                 }} className="dropdown-item">{state.isDarkMode ? 'Light Mode' : 'Dark Mode'}</button>
+                <button onClick={() => dispatch({ type: 'SET_MIC_ENABLED', micEnabled: !state.micEnabled })} className="dropdown-item">{state.micEnabled ? 'Disable Microphone' : 'Enable Microphone'}</button>
                 
               </div>
             )}

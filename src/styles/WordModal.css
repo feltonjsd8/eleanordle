@@ -23,12 +23,22 @@
     animation: slideIn 0.3s ease-out;
 }
 
+
 .modal-header {
-    padding: 20px;
+    padding: 10px 0 8px 0;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     border-bottom: 1px solid #eee;
+    text-align: center;
+}
+
+.modal-header h2 {
+    margin: 0 auto;
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.01em;
 }
 
 .modal-header.success {
