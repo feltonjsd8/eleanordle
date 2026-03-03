@@ -8,9 +8,7 @@ const DefinitionModal = ({ isOpen, onClose, word, definition }) => {
     return (
         <div className="modal-overlay">
             <div className="modal-content">
-                <div className="modal-header">
-                    <h2>Definition</h2>
-                </div>
+                {/* Removed modal-header and Definition title for cleaner look */}
                 <div className="modal-body">
                     <div className="word-section">
                         <h3>The word is: <span className="highlighted-word">{word}</span></h3>
@@ -31,8 +29,8 @@ const DefinitionModal = ({ isOpen, onClose, word, definition }) => {
                             </div>
                         ))}
                     </div>
-                    <div style={{ textAlign: 'center', marginTop: 24 }}>
-                        <button className="modal-action-btn" onClick={onClose} autoFocus>Close</button>
+                    <div className="centered-close-btn">
+                        <button className="modal-action-btn close-button" onClick={onClose} autoFocus>Close</button>
                     </div>
                 </div>
             </div>

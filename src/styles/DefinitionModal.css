@@ -1,3 +1,9 @@
+.centered-close-btn {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 24px;
+}
 
 .modal-overlay {
     position: fixed;
@@ -32,23 +38,23 @@
     border-bottom: 1px solid #eee;
 }
 
+/* Make close button match modal-action-btn style */
 .close-button {
-    background: none;
+    background-color: #1a73e8;
+    color: #fff;
     border: none;
-    font-size: 24px;
-    color: inherit;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 500;
+    padding: 10px 28px;
     cursor: pointer;
-    padding: 0;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(26, 115, 232, 0.08);
+    transition: background 0.2s, box-shadow 0.2s;
+    outline: none;
 }
-
-.close-button:hover {
-    background-color: rgba(0, 0, 0, 0.1);
+.close-button:hover, .close-button:focus {
+    background-color: #1761c7;
+    box-shadow: 0 4px 16px rgba(26, 115, 232, 0.12);
 }
 
 .modal-body {
