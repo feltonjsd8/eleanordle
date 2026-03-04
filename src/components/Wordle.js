@@ -27,14 +27,25 @@ const hashToUint32 = (str) => {
   return hash >>> 0;
 };
 
-const getClueForDaily = (definitions, dateKey) => {
-  // Deterministically select a definition using the date key as a seed
+const getClueForDaily = (definitions, dateKey, word) => {
+  // Deterministically select a normalized definition so API ordering differences do not matter.
   if (!definitions || definitions.length === 0) {
     return 'No clue available';
   }
-  const seed = hashToUint32(dateKey);
-  const idx = seed % definitions.length;
-  return definitions[idx]?.definition || 'No clue available';
+
+  const normalized = Array.from(
+    new Set(
+      definitions
+        .map((entry) => (entry?.definition || '').trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  if (normalized.length === 0) return 'No clue available';
+
+  const seed = hashToUint32(`${dateKey}:${word}`);
+  const idx = seed % normalized.length;
+  return normalized[idx];
 };
 
 const buildShareText = ({ dateKey, evaluations, isSuccess }) => {
@@ -267,21 +278,21 @@ const Wordle = ({ onBackToMenu }) => {
 
   const getOrCreateDailyTargetWord = useCallback((dateKey) => {
     const key = getDailyTargetStorageKey(dateKey);
-    const existing = localStorage.getItem(key);
-    // Only trust the cache if the word came from the static list.
-    // Old API-fetched words won't be in DAILY_WORDS and must be replaced.
-    if (existing && DAILY_WORDS.includes(existing)) return existing;
-
     const seed = hashToUint32(dateKey);
     const idx = seed % DAILY_WORDS.length;
-    const word = DAILY_WORDS[idx];
-    localStorage.setItem(key, word);
+    const canonicalWord = DAILY_WORDS[idx];
+
+    const existing = localStorage.getItem(key);
+    // Enforce the canonical word for this date. This fixes stale caches from older builds/logic.
+    if (existing === canonicalWord) return existing;
+
+    localStorage.setItem(key, canonicalWord);
     // If the word changed, clear the stale clue so it gets re-fetched
-    if (existing && existing !== word) {
+    if (existing && existing !== canonicalWord) {
       localStorage.removeItem(getDailyClueStorageKey(dateKey));
       localStorage.removeItem(getDailyStateStorageKey(dateKey));
     }
-    return word;
+    return canonicalWord;
   }, []);
 
   const getOrCreateDailyClue = useCallback(async (word, dateKey) => {
@@ -291,7 +302,7 @@ const Wordle = ({ onBackToMenu }) => {
 
     try {
       const def = await getWordDefinition(word);
-      const clue = getClueForDaily(def.definitions, dateKey);
+      const clue = getClueForDaily(def.definitions, dateKey, word);
       localStorage.setItem(key, clue);
       return clue;
     } catch (error) {
