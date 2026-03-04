@@ -9,6 +9,7 @@ import Logo from './Logo';
 
 const GAME_MODE_DAILY = 'daily';
 const GAME_MODE_PRACTICE = 'practice';
+const DAILY_STORAGE_MIGRATION_KEY = 'eleanordle:migration:daily-cleanup-v1';
 
 const getLocalDateKey = (date = new Date()) => {
   const year = date.getUTCFullYear();
@@ -276,6 +277,23 @@ const Wordle = ({ onBackToMenu }) => {
   const getDailyClueStorageKey = (dateKey) => `eleanordle:daily:${dateKey}:clue`;
   const getDailyStateStorageKey = (dateKey) => `eleanordle:daily:${dateKey}:state`;
 
+  const runDailyStorageCleanupMigration = useCallback(() => {
+    try {
+      if (localStorage.getItem(DAILY_STORAGE_MIGRATION_KEY) === 'done') return;
+
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('eleanordle:daily:')) {
+          localStorage.removeItem(key);
+        }
+      }
+
+      localStorage.setItem(DAILY_STORAGE_MIGRATION_KEY, 'done');
+    } catch (error) {
+      console.error('Daily storage cleanup migration failed:', error);
+    }
+  }, []);
+
   const getOrCreateDailyTargetWord = useCallback((dateKey) => {
     const key = getDailyTargetStorageKey(dateKey);
     const seed = hashToUint32(dateKey);
@@ -416,6 +434,7 @@ const Wordle = ({ onBackToMenu }) => {
   }, [getOrCreateDailyTargetWord, getOrCreateDailyClue, loadDailySavedState]);
 
   useEffect(() => {
+    runDailyStorageCleanupMigration();
     // Default to Daily mode on load
     startDailyGame(getLocalDateKey());
     dispatch({ type: 'SET_STATS', stats: loadStats() });
