@@ -1,0 +1,432 @@
+.tutorial-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-out;
+  backdrop-filter: blur(4px);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.tutorial-modal {
+  background: white;
+  border-radius: 16px;
+  padding: 40px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  position: relative;
+  animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tutorial-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.tutorial-close:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.tutorial-content {
+  text-align: center;
+  margin-bottom: 32px;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.tutorial-header-tiles {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.tutorial-tile {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  background: #ccc;
+  color: white;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.tutorial-tile--correct {
+  background: #10b981;
+}
+
+.tutorial-tile--wrong-position {
+  background: #f59e0b;
+}
+
+.tutorial-tile--incorrect {
+  background: #9ca3af;
+}
+
+.tutorial-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 12px 0 8px;
+  color: #222;
+}
+
+.tutorial-subtitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: #666;
+  margin: 0 0 16px;
+}
+
+.tutorial-description {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #555;
+  margin: 16px 0 0;
+  white-space: pre-line;
+}
+
+/* Example Section */
+.tutorial-example {
+  background: #f9f9f9;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 16px;
+  animation: fadeIn 0.5s ease-out 0.2s both;
+}
+
+.example-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #999;
+  margin-bottom: 12px;
+  letter-spacing: 0.5px;
+}
+
+.example-tiles {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.example-tile {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 18px;
+  color: white;
+  background: #ccc;
+  border-radius: 6px;
+  border: 2px solid #ccc;
+  transition: all 0.3s;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.example-tile.flip {
+  animation: tileFlip 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) var(--flip-delay, 0ms);
+}
+
+@keyframes tileFlip {
+  0% {
+    transform: rotateY(0) scaleX(1);
+    background: #ccc;
+  }
+  49% {
+    transform: rotateY(90deg) scaleX(0);
+  }
+  50% {
+    transform: rotateY(90deg) scaleX(0);
+  }
+  51% {
+    transform: rotateY(90deg) scaleX(0);
+  }
+  100% {
+    transform: rotateY(0) scaleX(1);
+  }
+}
+
+.example-tile.correct {
+  background: #10b981;
+  border-color: #10b981;
+}
+
+.example-tile.wrong-position {
+  background: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.example-tile.incorrect {
+  background: #9ca3af;
+  border-color: #9ca3af;
+}
+
+.example-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  color: #666;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+}
+
+.legend-tile {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+  color: white;
+  border-radius: 4px;
+  background: #ccc;
+}
+
+.legend-tile.correct {
+  background: #10b981;
+}
+
+.legend-tile.wrong-position {
+  background: #f59e0b;
+}
+
+.legend-tile.incorrect {
+  background: #9ca3af;
+}
+
+/* Footer */
+.tutorial-footer {
+  border-top: 1px solid #e5e5e5;
+  padding-top: 24px;
+  animation: fadeIn 0.5s ease-out 0.2s both;
+}
+
+.tutorial-steps {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.step-dot {
+  width: 8px;
+  height: 8px;
+  border: none;
+  border-radius: 50%;
+  background: #e5e5e5;
+  cursor: pointer;
+  transition: all 0.3s;
+  padding: 0;
+}
+
+.step-dot.active {
+  background: #3b82f6;
+  width: 24px;
+  border-radius: 4px;
+}
+
+.step-dot:hover {
+  background: #d1d5db;
+}
+
+.step-dot.active:hover {
+  background: #2563eb;
+}
+
+.tutorial-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.tutorial-btn {
+  padding: 10px 20px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  min-width: 100px;
+}
+
+.tutorial-btn--primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.tutorial-btn--primary:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.tutorial-btn--secondary {
+  background: #f3f4f6;
+  color: #333;
+  border-color: #e5e5e5;
+}
+
+.tutorial-btn--secondary:hover:not(:disabled) {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.tutorial-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .tutorial-modal {
+    background: #1f2937;
+    color: #f3f4f6;
+  }
+
+  .tutorial-close {
+    color: #d1d5db;
+  }
+
+  .tutorial-close:hover {
+    background: #374151;
+    color: #f3f4f6;
+  }
+
+  .tutorial-title {
+    color: #f9fafb;
+  }
+
+  .tutorial-subtitle {
+    color: #d1d5db;
+  }
+
+  .tutorial-description {
+    color: #d1d5db;
+  }
+
+  .tutorial-example {
+    background: #111827;
+  }
+
+  .example-label {
+    color: #6b7280;
+  }
+
+  .tutorial-footer {
+    border-top-color: #374151;
+  }
+
+  .step-dot {
+    background: #4b5563;
+  }
+
+  .step-dot:hover {
+    background: #6b7280;
+  }
+
+  .tutorial-btn--secondary {
+    background: #374151;
+    color: #f3f4f6;
+    border-color: #4b5563;
+  }
+
+  .tutorial-btn--secondary:hover:not(:disabled) {
+    background: #4b5563;
+    border-color: #6b7280;
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 640px) {
+  .tutorial-modal {
+    padding: 24px;
+    max-height: 90vh;
+  }
+
+  .tutorial-icon {
+    font-size: 40px;
+  }
+
+  .tutorial-title {
+    font-size: 20px;
+  }
+
+  .tutorial-subtitle {
+    font-size: 14px;
+  }
+
+  .example-tiles {
+    gap: 4px;
+  }
+
+  .example-tile {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+  }
+
+  .tutorial-buttons {
+    flex-direction: column;
+  }
+
+  .tutorial-btn {
+    width: 100%;
+  }
+}

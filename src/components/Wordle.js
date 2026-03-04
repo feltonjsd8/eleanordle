@@ -5,6 +5,7 @@ import DAILY_WORDS from '../services/wordList';
 import { loadStats, recordGameResult } from '../services/statsService';
 import WordModal from './WordModal';
 import DefinitionModal from './DefinitionModal';
+import TutorialModal from './TutorialModal';
 import Logo from './Logo';
 
 const GAME_MODE_DAILY = 'daily';
@@ -135,6 +136,7 @@ const initialState = {
   animateStreak: false,
   stats: null,
   micEnabled: false,
+  showTutorial: false,
 };
 
 function reducer(state, action) {
@@ -261,6 +263,8 @@ function reducer(state, action) {
       return { ...state, stats: action.stats };
     case 'SET_MIC_ENABLED':
       return { ...state, micEnabled: action.micEnabled };
+    case 'SET_SHOW_TUTORIAL':
+      return { ...state, showTutorial: action.showTutorial };
     default:
       return state;
   }
@@ -441,6 +445,15 @@ const Wordle = ({ onBackToMenu }) => {
     // Default to Daily mode on load
     startDailyGame(getLocalDateKey());
     dispatch({ type: 'SET_STATS', stats: loadStats(GAME_MODE_DAILY) });
+    
+    // Show tutorial on first visit
+    const hasSeenTutorial = localStorage.getItem('eleanordle:hasSeenTutorial');
+    if (!hasSeenTutorial) {
+      setTimeout(() => {
+        dispatch({ type: 'SET_SHOW_TUTORIAL', showTutorial: true });
+      }, 500);
+      localStorage.setItem('eleanordle:hasSeenTutorial', 'true');
+    }
     // eslint-disable-next-line
   }, []);
 
@@ -1078,6 +1091,10 @@ const Wordle = ({ onBackToMenu }) => {
                   localStorage.setItem('darkMode', next);
                 }} className="dropdown-item">{state.isDarkMode ? 'Light Mode' : 'Dark Mode'}</button>
                 <button onClick={() => dispatch({ type: 'SET_MIC_ENABLED', micEnabled: !state.micEnabled })} className="dropdown-item">{state.micEnabled ? 'Disable Microphone' : 'Enable Microphone'}</button>
+                <button onClick={() => {
+                  dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
+                  dispatch({ type: 'SET_SHOW_TUTORIAL', showTutorial: true });
+                }} className="dropdown-item">Tutorial</button>
                 
               </div>
             )}
@@ -1221,6 +1238,10 @@ const Wordle = ({ onBackToMenu }) => {
         onClose={() => dispatch({ type: 'SET_SHOW_DEFINITION_MODAL', showDefinitionModal: false })}
         word={state.definitionModalWord}
         definition={state.definitionModalDefinition}
+      />
+      <TutorialModal
+        isOpen={state.showTutorial}
+        onClose={() => dispatch({ type: 'SET_SHOW_TUTORIAL', showTutorial: false })}
       />
     </div>
   );
