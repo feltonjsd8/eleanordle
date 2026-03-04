@@ -985,6 +985,14 @@ const Wordle = ({ onBackToMenu }) => {
         aria-label="Wordle guess input"
         readOnly
       />
+      <div className="mode-header">
+        {(state.gameMode === GAME_MODE_DAILY ? 'DAILY' : 'INFINITE').split('').map((letter, idx) => (
+          <span key={`${letter}-${idx}`} className="mode-logo-tile" aria-hidden="true">
+            {letter}
+          </span>
+        ))}
+        <span className="sr-only">{state.gameMode === GAME_MODE_DAILY ? 'Daily mode' : 'Infinite mode'}</span>
+      </div>
       <div className="game-header">
         <div className="header-content">
           <h1><Logo /></h1>
@@ -1083,9 +1091,6 @@ const Wordle = ({ onBackToMenu }) => {
       )}
       {state.isLoading && <div className="loading">Loading words...</div>}
       <div className="game-container">
-        <div className="mode-header">
-          {state.gameMode === GAME_MODE_DAILY ? 'Daily' : 'Infinite'}
-        </div>
         <div className="wordle-grid">
           {state.guesses.map((guess, rowIndex) => {
             let showDefinitionIcon = false;
