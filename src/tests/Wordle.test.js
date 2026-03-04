@@ -31,7 +31,7 @@ describe('Wordle Component', () => {
 
     fireEvent.click(screen.getByLabelText('Open menu'));
     expect(screen.queryByText('Reveal')).not.toBeInTheDocument();
-    expect(screen.getByText('Practice Mode')).toBeInTheDocument();
+    expect(screen.getByText('Infinite')).toBeInTheDocument();
   });
 
   it('switches to Practice mode and uses a random word excluding today\'s daily', async () => {
@@ -48,7 +48,7 @@ describe('Wordle Component', () => {
 
     // Switch modes
     fireEvent.click(screen.getByLabelText('Open menu'));
-    fireEvent.click(screen.getByText('Practice Mode'));
+    fireEvent.click(screen.getByText('Infinite'));
 
     // Practice fetch should be called with the daily word excluded
     expect(getRandomWord).toHaveBeenLastCalledWith([dailyWord]);

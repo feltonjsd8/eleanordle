@@ -1061,7 +1061,7 @@ const Wordle = ({ onBackToMenu }) => {
                   }}
                   className="dropdown-item"
                 >
-                  {state.gameMode === GAME_MODE_DAILY ? 'Practice Mode' : 'Daily Mode'}
+                  {state.gameMode === GAME_MODE_DAILY ? 'Infinite' : 'Daily'}
                 </button>
                 <button onClick={() => dispatch({ type: 'SET_IS_CONTRAST_MODE', isContrastMode: !state.isContrastMode })} className="dropdown-item">Contrast Mode</button>
                 <button onClick={() => {
@@ -1083,6 +1083,9 @@ const Wordle = ({ onBackToMenu }) => {
       )}
       {state.isLoading && <div className="loading">Loading words...</div>}
       <div className="game-container">
+        <div className="mode-header">
+          {state.gameMode === GAME_MODE_DAILY ? 'Daily' : 'Infinite'}
+        </div>
         <div className="wordle-grid">
           {state.guesses.map((guess, rowIndex) => {
             let showDefinitionIcon = false;
