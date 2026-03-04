@@ -6,7 +6,8 @@ const StatsPanel = ({ stats }) => {
 
     const winRate = stats.played > 0 ? Math.round((stats.won / stats.played) * 100) : 0;
     const avgGuesses = stats.won > 0 ? (stats.totalGuessesOnWins / stats.won).toFixed(1) : '—';
-    const maxDist = Math.max(1, ...Object.values(stats.guessDistribution));
+    const maxDist = Math.max(...Object.values(stats.guessDistribution));
+    const maxDistForWidth = Math.max(1, maxDist);
 
     return (
         <div className="stats-panel">
@@ -37,12 +38,13 @@ const StatsPanel = ({ stats }) => {
             <div className="stats-distribution">
                 {[1, 2, 3, 4, 5, 6].map((n) => {
                     const count = stats.guessDistribution[n] || 0;
-                    const pct = Math.max(7, Math.round((count / maxDist) * 100));
+                    const pct = Math.max(7, Math.round((count / maxDistForWidth) * 100));
+                    const isLargest = count > 0 && count === maxDist;
                     return (
                         <div key={n} className="dist-row">
                             <span className="dist-label">{n}</span>
                             <div className="dist-bar-wrap">
-                                <div className="dist-bar" style={{ width: `${pct}%` }}>
+                                <div className={`dist-bar ${isLargest ? 'dist-bar--max' : ''}`} style={{ width: `${pct}%` }}>
                                     {count}
                                 </div>
                             </div>

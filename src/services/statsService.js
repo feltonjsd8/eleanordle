@@ -1,4 +1,7 @@
-const STATS_KEY = 'eleanordle:stats';
+const STATS_KEY_PREFIX = 'eleanordle:stats';
+const MODE_DAILY = 'daily';
+
+const getStatsKey = (mode = MODE_DAILY) => `${STATS_KEY_PREFIX}:${mode}`;
 
 const defaultStats = () => ({
   played: 0,
@@ -10,9 +13,9 @@ const defaultStats = () => ({
   lastDailyCompleted: null,
 });
 
-export const loadStats = () => {
+export const loadStats = (mode = MODE_DAILY) => {
   try {
-    const raw = localStorage.getItem(STATS_KEY);
+    const raw = localStorage.getItem(getStatsKey(mode));
     if (!raw) return defaultStats();
     const parsed = JSON.parse(raw);
     const defaults = defaultStats();
@@ -31,14 +34,14 @@ export const loadStats = () => {
  * For daily games pass the dailyDateKey so a reload does not double-count.
  * Returns the updated stats object.
  */
-export const recordGameResult = ({ isSuccess, guessCount, dailyDateKey = null }) => {
-  const stats = loadStats();
+export const recordGameResult = ({ isSuccess, guessCount, dailyDateKey = null, mode = MODE_DAILY }) => {
+  const stats = loadStats(mode);
 
-  // Avoid double-counting if the daily was already recorded
-  if (dailyDateKey && stats.lastDailyCompleted === dailyDateKey) {
+  // Avoid double-counting if the daily was already recorded.
+  if (mode === MODE_DAILY && dailyDateKey && stats.lastDailyCompleted === dailyDateKey) {
     return stats;
   }
-  if (dailyDateKey) {
+  if (mode === MODE_DAILY && dailyDateKey) {
     stats.lastDailyCompleted = dailyDateKey;
   }
 
@@ -58,7 +61,7 @@ export const recordGameResult = ({ isSuccess, guessCount, dailyDateKey = null })
   }
 
   try {
-    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+    localStorage.setItem(getStatsKey(mode), JSON.stringify(stats));
   } catch {
     // ignore storage errors
   }

@@ -380,6 +380,7 @@ const Wordle = ({ onBackToMenu }) => {
       const newWord = await getRandomWord(exclude);
       dispatch({ type: 'RESET', targetWord: newWord, keepStreak: !resetStreak, resetStreak });
       dispatch({ type: 'SET_GAME_MODE', gameMode: GAME_MODE_PRACTICE });
+      dispatch({ type: 'SET_STATS', stats: loadStats(GAME_MODE_PRACTICE) });
       try {
         const def = await getWordDefinition(newWord);
         dispatch({ type: 'SET_CLUE', clue: def.definitions[0]?.definition || 'No clue available' });
@@ -417,10 +418,12 @@ const Wordle = ({ onBackToMenu }) => {
           letterStates: saved.letterStates || computeLetterStatesFromHistory(saved.guesses || Array(6).fill(''), saved.evaluations || Array(6).fill(null)),
         };
         dispatch({ type: 'LOAD_SAVED_GAME', saved: hydrated });
+        dispatch({ type: 'SET_STATS', stats: loadStats(GAME_MODE_DAILY) });
       } else {
         dispatch({ type: 'RESET', targetWord, keepStreak: false, resetStreak: true });
         dispatch({ type: 'SET_GAME_MODE', gameMode: GAME_MODE_DAILY });
         dispatch({ type: 'SET_DAILY_DATE_KEY', dailyDateKey: normalizedDateKey });
+        dispatch({ type: 'SET_STATS', stats: loadStats(GAME_MODE_DAILY) });
         const clue = await getOrCreateDailyClue(targetWord, normalizedDateKey);
         dispatch({ type: 'SET_CLUE', clue });
         dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
@@ -437,7 +440,7 @@ const Wordle = ({ onBackToMenu }) => {
     runDailyStorageCleanupMigration();
     // Default to Daily mode on load
     startDailyGame(getLocalDateKey());
-    dispatch({ type: 'SET_STATS', stats: loadStats() });
+    dispatch({ type: 'SET_STATS', stats: loadStats(GAME_MODE_DAILY) });
     // eslint-disable-next-line
   }, []);
 
@@ -670,7 +673,7 @@ const Wordle = ({ onBackToMenu }) => {
         dispatch({ type: 'SET_GAME_OVER', gameOver: true });
         dispatch({ type: 'SET_IS_SUCCESS', isSuccess: true });
         dispatch({ type: 'SET_COMPLETED_WORD', completedWord: state.targetWord });
-        const updatedStats = recordGameResult({ isSuccess: true, guessCount: winGuessCount, dailyDateKey: winDailyKey });
+        const updatedStats = recordGameResult({ isSuccess: true, guessCount: winGuessCount, dailyDateKey: winDailyKey, mode: state.gameMode });
         dispatch({ type: 'SET_STATS', stats: updatedStats });
         getWordDefinition(state.targetWord).then(def => {
           dispatch({ type: 'SET_WORD_DEFINITION', wordDefinition: def });
@@ -683,7 +686,7 @@ const Wordle = ({ onBackToMenu }) => {
         dispatch({ type: 'SET_GAME_OVER', gameOver: true });
         dispatch({ type: 'SET_COMPLETED_WORD', completedWord: state.targetWord });
         dispatch({ type: 'RESET_STREAK' });
-        const updatedStats = recordGameResult({ isSuccess: false, guessCount: 6, dailyDateKey: lossDailyKey });
+        const updatedStats = recordGameResult({ isSuccess: false, guessCount: 6, dailyDateKey: lossDailyKey, mode: state.gameMode });
         dispatch({ type: 'SET_STATS', stats: updatedStats });
         getWordDefinition(state.targetWord).then(def => {
           dispatch({ type: 'SET_WORD_DEFINITION', wordDefinition: def });

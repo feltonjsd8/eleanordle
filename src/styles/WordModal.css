@@ -310,6 +310,11 @@
     box-sizing: border-box;
 }
 
+.dist-bar--max {
+    background-color: #f3c63f;
+    color: #1f1f1f;
+}
+
 /* Dark mode overrides */
 .wordle.dark .stats-panel {
     border-top-color: #3a3a3c;
@@ -323,6 +328,11 @@
 
 .wordle.dark .dist-bar {
     background-color: #565758;
+}
+
+.wordle.dark .dist-bar--max {
+    background-color: #f3c63f;
+    color: #1f1f1f;
 }
 
 /* ── Dark Mode ── */

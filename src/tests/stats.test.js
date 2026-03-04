@@ -57,6 +57,22 @@ describe('statsService', () => {
     expect(stats.won).toBe(2);
   });
 
+  it('tracks daily and practice stats separately', () => {
+    recordGameResult({ isSuccess: true, guessCount: 2, dailyDateKey: '2026-03-01', mode: 'daily' });
+    recordGameResult({ isSuccess: false, guessCount: 6, mode: 'practice' });
+
+    const dailyStats = loadStats('daily');
+    const practiceStats = loadStats('practice');
+
+    expect(dailyStats.played).toBe(1);
+    expect(dailyStats.won).toBe(1);
+    expect(dailyStats.guessDistribution[2]).toBe(1);
+
+    expect(practiceStats.played).toBe(1);
+    expect(practiceStats.won).toBe(0);
+    expect(practiceStats.guessDistribution[2]).toBe(0);
+  });
+
   it('persists stats to localStorage', () => {
     recordGameResult({ isSuccess: true, guessCount: 4 });
     const loaded = loadStats();
