@@ -3,6 +3,7 @@ import '../styles/Wordle.css';
 import { getRandomWord, getWordDefinition, isValidWord, getDictionaryWords } from '../services/dictionaryService';
 import DAILY_WORDS from '../services/wordList';
 import { loadStats, recordGameResult } from '../services/statsService';
+import { maskWordInText } from '../services/textMasking';
 import WordModal from './WordModal';
 import DefinitionModal from './DefinitionModal';
 import TutorialModal from './TutorialModal';
@@ -47,7 +48,7 @@ const getClueForDaily = (definitions, dateKey, word) => {
 
   const seed = hashToUint32(`${dateKey}:${word}`);
   const idx = seed % normalized.length;
-  return normalized[idx];
+  return maskWordInText(normalized[idx], word);
 };
 
 const buildShareText = ({ dateKey, evaluations, isSuccess }) => {
@@ -320,7 +321,13 @@ const Wordle = ({ onBackToMenu }) => {
   const getOrCreateDailyClue = useCallback(async (word, dateKey) => {
     const key = getDailyClueStorageKey(dateKey);
     const existing = localStorage.getItem(key);
-    if (existing) return existing;
+    if (existing) {
+      const maskedClue = maskWordInText(existing, word);
+      if (maskedClue !== existing) {
+        localStorage.setItem(key, maskedClue);
+      }
+      return maskedClue;
+    }
 
     try {
       const def = await getWordDefinition(word);
@@ -387,7 +394,7 @@ const Wordle = ({ onBackToMenu }) => {
       dispatch({ type: 'SET_STATS', stats: loadStats(GAME_MODE_PRACTICE) });
       try {
         const def = await getWordDefinition(newWord);
-        dispatch({ type: 'SET_CLUE', clue: def.definitions[0]?.definition || 'No clue available' });
+        dispatch({ type: 'SET_CLUE', clue: maskWordInText(def.definitions[0]?.definition || 'No clue available', newWord) });
         dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
       } catch (e) {
         dispatch({ type: 'SET_CLUE', clue: 'No clue available' });
@@ -413,6 +420,7 @@ const Wordle = ({ onBackToMenu }) => {
           ...initialState,
           ...saved,
           targetWord,
+          clue: maskWordInText(saved.clue, targetWord),
           gameMode: GAME_MODE_DAILY,
           dailyDateKey: normalizedDateKey,
           // ensure defaults for arrays if missing
@@ -807,7 +815,7 @@ const Wordle = ({ onBackToMenu }) => {
     if (state.targetWord) {
       try {
         const def = await getWordDefinition(state.targetWord);
-        dispatch({ type: 'SET_CLUE', clue: def.definitions[0]?.definition || 'No clue available' });
+        dispatch({ type: 'SET_CLUE', clue: maskWordInText(def.definitions[0]?.definition || 'No clue available', state.targetWord) });
         dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
       } catch (error) {
         console.error('Error fetching clue:', error);
