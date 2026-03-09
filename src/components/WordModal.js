@@ -6,7 +6,8 @@ const StatsPanel = ({ stats }) => {
 
     const winRate = stats.played > 0 ? Math.round((stats.won / stats.played) * 100) : 0;
     const avgGuesses = stats.won > 0 ? (stats.totalGuessesOnWins / stats.won).toFixed(1) : '—';
-    const maxDist = Math.max(...Object.values(stats.guessDistribution));
+    const distributionKeys = Object.keys(stats.guessDistribution || {}).map(Number).sort((a, b) => a - b);
+    const maxDist = Math.max(...Object.values(stats.guessDistribution || { 0: 0 }));
     const maxDistForWidth = Math.max(1, maxDist);
 
     return (
@@ -36,7 +37,7 @@ const StatsPanel = ({ stats }) => {
             </div>
             <h4 className="stats-heading">GUESS DISTRIBUTION</h4>
             <div className="stats-distribution">
-                {[1, 2, 3, 4, 5, 6].map((n) => {
+                {distributionKeys.map((n) => {
                     const count = stats.guessDistribution[n] || 0;
                     const pct = Math.max(7, Math.round((count / maxDistForWidth) * 100));
                     const isLargest = count > 0 && count === maxDist;
@@ -68,19 +69,38 @@ const WordModal = ({
     shareText,
     stats,
     onShare,
+    variant = 'result',
+    title,
+    primaryLabel,
+    progressLabel,
 }) => {
     if (!isOpen) return null;
 
     const isDaily = gameMode === 'daily';
-    const primaryLabel = isDaily ? 'Close' : (isSuccess ? 'Next Word' : 'Try Again');
+    const resolvedPrimaryLabel = primaryLabel || (isDaily ? 'Close' : (isSuccess ? 'Next Word' : 'Try Again'));
+    const resolvedTitle = title || (isSuccess ? 'Congratulations!' : 'Game Over');
+    const showStats = variant === 'result';
+    const showDefinitions = Boolean(definition?.definitions?.length);
+    const showTopPrimaryAction = gameMode === 'ladder';
 
     return (
         <div className="modal-overlay">
             <div className="modal-content">
                 <div className={`modal-header ${isSuccess ? 'success' : 'failure'}`}>
-                    <h2>{isSuccess ? 'Congratulations!' : 'Game Over'}</h2>
+                    <h2>{resolvedTitle}</h2>
                 </div>
+                {showTopPrimaryAction && (
+                    <div className="modal-top-actions">
+                        <button
+                            className={isSuccess ? 'next-word-button' : 'try-again-button'}
+                            onClick={onNextWord}
+                        >
+                            {resolvedPrimaryLabel}
+                        </button>
+                    </div>
+                )}
                 <div className="modal-body">
+                    {progressLabel && <p className="modal-progress-label">{progressLabel}</p>}
                     <div className="word-section">
                         <h3>The word was: <span className="highlighted-word">{word}</span></h3>
                         {definition?.phonetic && (
@@ -88,9 +108,9 @@ const WordModal = ({
                         )}
                     </div>
 
-                    <StatsPanel stats={stats} />
+                    {showStats && <StatsPanel stats={stats} />}
 
-                    {isDaily && shareText && (
+                    {showStats && isDaily && shareText && (
                         <div className="share-section">
                             <h4 className="share-title">Share</h4>
                             <div className="share-subtitle">Daily {dailyDateKey}</div>
@@ -98,7 +118,7 @@ const WordModal = ({
                         </div>
                     )}
 
-                    <div className="definitions-section">
+                    {showDefinitions && <div className="definitions-section">
                         {definition?.definitions?.map((def, index) => (
                             <div key={index} className="definition-item">
                                 {def.partOfSpeech && (
@@ -110,10 +130,10 @@ const WordModal = ({
                                 )}
                             </div>
                         ))}
-                    </div>
+                    </div>}
                 </div>
                 <div className="modal-footer">
-                    {isDaily && (
+                    {showStats && isDaily && (
                         <button className="share-button" onClick={onShare}>
                             Copy
                         </button>
@@ -122,7 +142,7 @@ const WordModal = ({
                         className={isDaily ? 'try-again-button' : (isSuccess ? 'next-word-button' : 'try-again-button')}
                         onClick={onNextWord}
                     >
-                        {primaryLabel}
+                        {resolvedPrimaryLabel}
                     </button>
                 </div>
             </div>

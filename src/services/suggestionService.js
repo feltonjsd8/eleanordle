@@ -1,6 +1,8 @@
 // Returns up to 10 suggested words matching the user's current guess and known letter states
 import { getDictionaryWords } from './dictionaryService';
 
+const getPattern = (wordLength) => '?'.repeat(wordLength);
+
 /**
  * Filters words based on known correct, present, and absent letters.
  * @param {string[]} allWords - List of all possible 5-letter words.
@@ -10,15 +12,16 @@ import { getDictionaryWords } from './dictionaryService';
  * @returns {string[]} Up to 10 suggested words
  */
 export async function getSuggestions(currentGuess, letterStates, evaluations) {
-  const allWords = (await getDictionaryWords()).map(w => w.toUpperCase());
+  const wordLength = currentGuess.length || evaluations.find(Boolean)?.length || 5;
+  const allWords = (await getDictionaryWords(null, wordLength)).map(w => w.toUpperCase());
   // Build constraints from evaluations
-  const correct = Array(5).fill(null);
+  const correct = Array(wordLength).fill(null);
   const present = new Set();
   const absent = new Set();
 
   evaluations.forEach((evalRow, rowIdx) => {
     if (!evalRow) return;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < wordLength; i++) {
       if (!evalRow[i]) continue;
       const letter = currentGuess[i]?.toUpperCase();
       if (!letter) continue;
@@ -31,13 +34,13 @@ export async function getSuggestions(currentGuess, letterStates, evaluations) {
   // Filter words
   const filtered = allWords.filter(word => {
     // Must match correct letters in position
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < wordLength; i++) {
       if (correct[i] && word[i] !== correct[i]) return false;
     }
     // Must include all present letters (but not in the same position)
     for (let l of present) {
       if (!word.includes(l)) return false;
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < wordLength; i++) {
         if (correct[i] !== l && word[i] === l) return false;
       }
     }
@@ -62,14 +65,15 @@ export async function getSuggestions(currentGuess, letterStates, evaluations) {
 export async function getDatamuseSuggestions(targetWord) {
   const uniqueLetters = Array.from(new Set(targetWord.toLowerCase().split('')));
   const allowed = new Set(uniqueLetters);
-  const url = `https://api.datamuse.com/words?sp=?????&max=1000`;
+  const wordLength = targetWord.length || 5;
+  const url = `https://api.datamuse.com/words?sp=${getPattern(wordLength)}&max=1000`;
   try {
     const resp = await fetch(url);
     const data = await resp.json();
     const filtered = data
       .map(w => w.word.toUpperCase())
       .filter(word =>
-        word.length === 5 &&
+        word.length === wordLength &&
         word.split('').every(l => allowed.has(l.toLowerCase())) &&
         word.split('').some(l => allowed.has(l.toLowerCase()))
       );
@@ -86,14 +90,15 @@ export async function getDatamuseSuggestions(targetWord) {
  * @returns {Promise<string[]>}
  */
 export async function getDatamuseValidSuggestions(correct, present) {
-  const url = `https://api.datamuse.com/words?sp=?????&max=1000`;
+  const wordLength = correct.length || 5;
+  const url = `https://api.datamuse.com/words?sp=${getPattern(wordLength)}&max=1000`;
   try {
     const resp = await fetch(url);
     const data = await resp.json();
     const filtered = data
       .map(w => w.word.toUpperCase())
       .filter(word =>
-        word.length === 5 &&
+        word.length === wordLength &&
         // All correct letters in correct positions
         correct.every((l, i) => !l || word[i] === l) &&
         // All present letters somewhere in the word
@@ -116,6 +121,7 @@ export async function getDatamuseValidSuggestions(correct, present) {
  * @returns {Promise<string[]>}
  */
 export async function getWordFinderSuggestions(correct, present, absent = new Set(), targetWord, wrongPosition = new Set()) {
+  const wordLength = correct.length || targetWord?.length || 5;
   // Build the 'spelled-like' pattern for Datamuse, e.g., 'a?p?l'
   const pattern = correct.map(l => (l ? l.toLowerCase() : '?')).join('');
   const url = `https://api.datamuse.com/words?sp=${pattern}&max=1000`;
@@ -131,7 +137,7 @@ export async function getWordFinderSuggestions(correct, present, absent = new Se
     const suggestions = data
       .map(w => w.word.toUpperCase())
       .filter(word => {
-        if (word.length !== 5 || !/^[A-Z]{5}$/.test(word) || word === targetWord) {
+        if (word.length !== wordLength || !new RegExp(`^[A-Z]{${wordLength}}$`).test(word) || word === targetWord) {
           return false;
         }
 

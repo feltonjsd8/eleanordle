@@ -60,9 +60,11 @@ describe('statsService', () => {
   it('tracks daily and practice stats separately', () => {
     recordGameResult({ isSuccess: true, guessCount: 2, dailyDateKey: '2026-03-01', mode: 'daily' });
     recordGameResult({ isSuccess: false, guessCount: 6, mode: 'practice' });
+    recordGameResult({ isSuccess: true, guessCount: 9, mode: 'ladder' });
 
     const dailyStats = loadStats('daily');
     const practiceStats = loadStats('practice');
+    const ladderStats = loadStats('ladder');
 
     expect(dailyStats.played).toBe(1);
     expect(dailyStats.won).toBe(1);
@@ -71,6 +73,10 @@ describe('statsService', () => {
     expect(practiceStats.played).toBe(1);
     expect(practiceStats.won).toBe(0);
     expect(practiceStats.guessDistribution[2]).toBe(0);
+
+    expect(ladderStats.played).toBe(1);
+    expect(ladderStats.won).toBe(1);
+    expect(ladderStats.guessDistribution[9]).toBe(1);
   });
 
   it('persists stats to localStorage', () => {
@@ -86,5 +92,16 @@ describe('statsService', () => {
     const stats = loadStats();
     const avg = stats.totalGuessesOnWins / stats.won;
     expect(avg).toBeCloseTo(3);
+  });
+
+  it('resets ladder streak only when a ladder run is lost', () => {
+    recordGameResult({ isSuccess: true, guessCount: 8, mode: 'ladder' });
+    recordGameResult({ isSuccess: true, guessCount: 10, mode: 'ladder' });
+    const stats = recordGameResult({ isSuccess: false, guessCount: 12, mode: 'ladder' });
+
+    expect(stats.played).toBe(3);
+    expect(stats.won).toBe(2);
+    expect(stats.currentStreak).toBe(0);
+    expect(stats.maxStreak).toBe(2);
   });
 });

@@ -1,14 +1,23 @@
 const STATS_KEY_PREFIX = 'eleanordle:stats';
 const MODE_DAILY = 'daily';
+const MODE_LADDER = 'ladder';
+
+const buildDistribution = (start, end) => {
+  const distribution = {};
+  for (let guess = start; guess <= end; guess++) {
+    distribution[guess] = 0;
+  }
+  return distribution;
+};
 
 const getStatsKey = (mode = MODE_DAILY) => `${STATS_KEY_PREFIX}:${mode}`;
 
-const defaultStats = () => ({
+const defaultStats = (mode = MODE_DAILY) => ({
   played: 0,
   won: 0,
   currentStreak: 0,
   maxStreak: 0,
-  guessDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+  guessDistribution: mode === MODE_LADDER ? buildDistribution(3, 18) : buildDistribution(1, 6),
   totalGuessesOnWins: 0,
   lastDailyCompleted: null,
 });
@@ -16,9 +25,9 @@ const defaultStats = () => ({
 export const loadStats = (mode = MODE_DAILY) => {
   try {
     const raw = localStorage.getItem(getStatsKey(mode));
-    if (!raw) return defaultStats();
+    if (!raw) return defaultStats(mode);
     const parsed = JSON.parse(raw);
-    const defaults = defaultStats();
+    const defaults = defaultStats(mode);
     return {
       ...defaults,
       ...parsed,

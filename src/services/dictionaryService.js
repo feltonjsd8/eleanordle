@@ -3,6 +3,94 @@ import { RegExpMatcher, englishDataset, englishRecommendedTransformers } from 'o
 const DATAMUSE_API_URL = 'https://api.datamuse.com/words';
 const DICTIONARY_API_URL = 'https://api.dictionaryapi.dev/api/v2/entries/en_GB/';
 
+const FALLBACK_WORDS_BY_LENGTH = {
+    4: [
+        'ARCH', 'BARK', 'COVE', 'DAWN', 'ECHO',
+        'FERN', 'GLOW', 'HAZE', 'ISLE', 'JOLT',
+        'KITE', 'LAMB', 'MOSS', 'NOVA', 'OPAL',
+        'PINE', 'QUAY', 'ROSE', 'SURF', 'TIDE'
+    ],
+    5: [
+        'HAPPY', 'BRAIN', 'CLOUD', 'DREAM', 'EAGLE',
+        'FLAME', 'GHOST', 'HEART', 'IVORY', 'JOKER',
+        'LIGHT', 'MUSIC', 'NIGHT', 'OCEAN', 'PEARL',
+        'QUICK', 'RIVER', 'STORM', 'TIGER', 'VOICE'
+    ],
+    6: [
+        'ANCHOR', 'BREEZE', 'CANDLE', 'DRAGON', 'EMBLEM',
+        'FALCON', 'GALAXY', 'HARBOR', 'ICICLE', 'JUNGLE',
+        'KETTLE', 'LAGOON', 'MEADOW', 'NECTAR', 'ORCHID',
+        'PLANET', 'QUARRY', 'RIPPLE', 'SPRING', 'THRONE'
+    ]
+};
+
+const getWordPattern = (length, firstLetter = '?') => {
+    const suffixLength = Math.max(0, length - 1);
+    return `${firstLetter}${'?'.repeat(suffixLength)}`;
+};
+
+const getWordRegex = (length) => new RegExp(`^[A-Z]{${length}}$`, 'i');
+
+const getCacheKey = (length) => `words:${length}`;
+
+const getSourceWordFromUrl = (url) => {
+    if (typeof url !== 'string' || url.length === 0) return '';
+
+    const normalizedUrl = url.split('?')[0].replace(/\/+$/, '');
+    const lastSegment = normalizedUrl.slice(normalizedUrl.lastIndexOf('/') + 1);
+
+    try {
+        return decodeURIComponent(lastSegment).toLowerCase();
+    } catch {
+        return lastSegment.toLowerCase();
+    }
+};
+
+const isCanonicalEntry = (entry, requestedWord) => {
+    if (entry?.word?.toLowerCase() !== requestedWord) {
+        return false;
+    }
+
+    const sourceWords = (entry?.sourceUrls || [])
+        .map(getSourceWordFromUrl)
+        .filter(Boolean);
+
+    if (sourceWords.length === 0) {
+        return true;
+    }
+
+    return sourceWords.every((sourceWord) => sourceWord === requestedWord);
+};
+
+const extractDefinitions = (entries) => {
+    const seen = new Set();
+
+    return entries.flatMap((entry) =>
+        (entry?.meanings || []).flatMap((meaning) =>
+            (meaning?.definitions || []).flatMap((definition) => {
+                const trimmedDefinition = definition?.definition?.trim();
+                if (!trimmedDefinition) {
+                    return [];
+                }
+
+                const item = {
+                    partOfSpeech: meaning?.partOfSpeech || '',
+                    definition: trimmedDefinition,
+                    example: definition?.example || ''
+                };
+                const dedupeKey = `${item.partOfSpeech}:${item.definition}:${item.example}`;
+
+                if (seen.has(dedupeKey)) {
+                    return [];
+                }
+
+                seen.add(dedupeKey);
+                return [item];
+            })
+        )
+    );
+};
+
 // Create a matcher instance for profanity checking
 const matcher = new RegExpMatcher({
     ...englishDataset.build(),
@@ -41,17 +129,24 @@ export const getWordDefinition = async (word) => {
             throw new Error('Definition not found');
         }
         const data = await response.json();
-        
-        // Extract the most relevant information
-        const definitions = data[0]?.meanings?.map(meaning => ({
-            partOfSpeech: meaning.partOfSpeech,
-            definition: meaning.definitions[0].definition,
-            example: meaning.definitions[0].example
-        })) || [];
+
+        const requestedWord = word.toLowerCase();
+        const exactEntries = Array.isArray(data)
+            ? data.filter((entry) => entry?.word?.toLowerCase() === requestedWord)
+            : [];
+        const canonicalEntries = exactEntries.filter((entry) => isCanonicalEntry(entry, requestedWord));
+        const selectedEntries = canonicalEntries.length > 0 ? canonicalEntries : exactEntries;
+        const definitions = extractDefinitions(selectedEntries);
+
+        if (selectedEntries.length === 0 || definitions.length === 0) {
+            throw new Error('Definition not found');
+        }
+
+        const preferredEntry = selectedEntries.find((entry) => entry?.phonetic) || selectedEntries[0];
 
         return {
-            word: data[0].word,
-            phonetic: data[0].phonetic || '',
+            word: preferredEntry.word,
+            phonetic: preferredEntry.phonetic || '',
             definitions
         };
     } catch (error) {
@@ -94,7 +189,7 @@ export const isValidWord = async (word) => {
     } catch (error) {
         console.error('Error checking word validity:', error);
         // Fall back to basic validation in case of API error
-        return /^[A-Z]{5}$/i.test(word);
+        return /^[A-Z]{4,6}$/i.test(word);
     }
 };
 
@@ -106,15 +201,16 @@ function getRandomItem(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
 }
 
-export const getRandomWord = async (excludeWords = []) => {
+export const getRandomWord = async (excludeWords = [], length = 5) => {
     try {
         // Try to get words from cache first
-        let words = wordCache.get('words');
+        const cacheKey = getCacheKey(length);
+        let words = wordCache.get(cacheKey);
 
         // If not in cache or running low on words, fetch new ones
         if (!words || words.length < 10) {
-            words = await getDictionaryWords();
-            wordCache.set('words', words);
+            words = await getDictionaryWords(null, length);
+            wordCache.set(cacheKey, words);
         }
 
         // Filter out excluded words
@@ -122,8 +218,8 @@ export const getRandomWord = async (excludeWords = []) => {
 
         // If we're running out of words, fetch new ones
         if (availableWords.length < 5) {
-            words = await getDictionaryWords();
-            wordCache.set('words', words);
+            words = await getDictionaryWords(null, length);
+            wordCache.set(cacheKey, words);
             availableWords = words.filter(word => !excludeWords.includes(word));
         }
 
@@ -134,7 +230,7 @@ export const getRandomWord = async (excludeWords = []) => {
             const def = await getWordDefinition(selectedWord);
             if (def && def.definitions && def.definitions.length > 0 && def.definitions[0].definition !== 'Definition not available') {
                 // Remove the selected word from the cache to avoid repetition
-                wordCache.set('words', words.filter(w => w !== selectedWord));
+                wordCache.set(cacheKey, words.filter(w => w !== selectedWord));
                 return selectedWord;
             } else {
                 // Remove this word from availableWords and try again
@@ -142,18 +238,19 @@ export const getRandomWord = async (excludeWords = []) => {
             }
         }
         // If no word with a clue is found, fetch a new batch and try again
-        words = await getDictionaryWords();
-        wordCache.set('words', words);
-        return getRandomWord(excludeWords);
+        words = await getDictionaryWords(null, length);
+        wordCache.set(cacheKey, words);
+        return getRandomWord(excludeWords, length);
     } catch (error) {
         console.error('Error getting random word:', error);
         return 'ERROR';
     }
 };
 
-export const getDictionaryWords = async (seed = null) => {
+export const getDictionaryWords = async (seed = null, length = 5) => {
     try {
         const apiWords = new Set();
+        const wordRegex = getWordRegex(length);
         const letterGroups = [
             'AEIOU',  // vowels
             'BCDFG',  // early consonants
@@ -170,7 +267,7 @@ export const getDictionaryWords = async (seed = null) => {
         for (const group of letterGroups) {
             const randomLetter = group[Math.floor(getRandom() * group.length)];
             const queries = [
-                `sp=${randomLetter}????`, // exactly 5 letters, starting with our chosen letter
+                `sp=${getWordPattern(length, randomLetter)}`,
                 'md=f' // include frequency information
             ];
 
@@ -194,7 +291,7 @@ export const getDictionaryWords = async (seed = null) => {
             // Filter and add valid words to the set (no definition check here)
             for (const wordObj of words) {
                 const wordStr = wordObj.word.toUpperCase();
-                if (!isCommonWord(wordStr) && /^[A-Z]{5}$/i.test(wordObj.word)) {
+                if (!isCommonWord(wordStr) && wordRegex.test(wordObj.word)) {
                     apiWords.add(wordStr);
                     validWordCache.add(wordStr); // Add to cache for future validation
                 }
@@ -218,13 +315,7 @@ export const getDictionaryWords = async (seed = null) => {
         return allWords;
     } catch (error) {
         console.error('Error in getDictionaryWords:', error);
-        // Add fallback words to cache as well
-        const fallbackWords = [
-            'HAPPY', 'BRAIN', 'CLOUD', 'DREAM', 'EAGLE',
-            'FLAME', 'GHOST', 'HEART', 'IVORY', 'JOKER',
-            'LIGHT', 'MUSIC', 'NIGHT', 'OCEAN', 'PEARL',
-            'QUICK', 'RIVER', 'STORM', 'TIGER', 'VOICE'
-        ];
+        const fallbackWords = FALLBACK_WORDS_BY_LENGTH[length] || FALLBACK_WORDS_BY_LENGTH[5];
         fallbackWords.forEach(word => validWordCache.add(word));
         return fallbackWords;
     }

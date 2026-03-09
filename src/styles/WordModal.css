@@ -74,6 +74,24 @@
     padding: 20px;
 }
 
+.modal-top-actions {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 16px 20px 0;
+    display: flex;
+    justify-content: center;
+    background-color: inherit;
+}
+
+.modal-progress-label {
+    margin: 0 0 16px;
+    text-align: center;
+    font-size: 0.95rem;
+    color: #555;
+    font-weight: 600;
+}
+
 .word-section {
     margin-bottom: 20px;
     text-align: center;
@@ -142,6 +160,11 @@
     font-size: 16px;
     cursor: pointer;
     transition: background-color 0.2s;
+}
+
+.modal-top-actions .next-word-button,
+.modal-top-actions .try-again-button {
+    min-width: 220px;
 }
 
 .next-word-button {
