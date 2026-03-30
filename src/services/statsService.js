@@ -1,6 +1,11 @@
 const STATS_KEY_PREFIX = 'eleanordle:stats';
 const MODE_DAILY = 'daily';
 const MODE_LADDER = 'ladder';
+const MODE_DAILY_LADDER = 'daily-ladder';
+
+const isDailyScopedMode = (mode) => mode === MODE_DAILY || mode === MODE_DAILY_LADDER;
+
+const isLadderStatsMode = (mode) => mode === MODE_LADDER || mode === MODE_DAILY_LADDER;
 
 const buildDistribution = (start, end) => {
   const distribution = {};
@@ -17,7 +22,7 @@ const defaultStats = (mode = MODE_DAILY) => ({
   won: 0,
   currentStreak: 0,
   maxStreak: 0,
-  guessDistribution: mode === MODE_LADDER ? buildDistribution(3, 18) : buildDistribution(1, 6),
+  guessDistribution: isLadderStatsMode(mode) ? buildDistribution(3, 18) : buildDistribution(1, 6),
   totalGuessesOnWins: 0,
   lastDailyCompleted: null,
 });
@@ -34,23 +39,23 @@ export const loadStats = (mode = MODE_DAILY) => {
       guessDistribution: { ...defaults.guessDistribution, ...parsed.guessDistribution },
     };
   } catch {
-    return defaultStats();
+    return defaultStats(mode);
   }
 };
 
 /**
  * Record the result of a completed game and persist to localStorage.
- * For daily games pass the dailyDateKey so a reload does not double-count.
+ * For daily-scoped games pass the dailyDateKey so a reload does not double-count.
  * Returns the updated stats object.
  */
 export const recordGameResult = ({ isSuccess, guessCount, dailyDateKey = null, mode = MODE_DAILY }) => {
   const stats = loadStats(mode);
 
-  // Avoid double-counting if the daily was already recorded.
-  if (mode === MODE_DAILY && dailyDateKey && stats.lastDailyCompleted === dailyDateKey) {
+  // Avoid double-counting if the daily-scoped game was already recorded.
+  if (isDailyScopedMode(mode) && dailyDateKey && stats.lastDailyCompleted === dailyDateKey) {
     return stats;
   }
-  if (mode === MODE_DAILY && dailyDateKey) {
+  if (isDailyScopedMode(mode) && dailyDateKey) {
     stats.lastDailyCompleted = dailyDateKey;
   }
 

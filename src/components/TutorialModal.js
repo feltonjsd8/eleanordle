@@ -37,9 +37,9 @@ const TutorialModal = ({ isOpen, onClose }) => {
       description: 'Use the information from previous guesses to make better guesses. Each guess gets you closer!',
     },
     {
-      title: 'Daily & Infinite Modes',
-      subtitle: 'Two ways to play',
-      description: 'Daily: One new puzzle each day, shareable results.\nInfinite: Play as many as you want, practice mode.',
+      title: 'Daily, Daily Ladder & Infinite',
+      subtitle: 'Three ways to play',
+      description: 'Daily: One new puzzle each day, shareable results.\nDaily Ladder: A fixed 4, 5, 6-letter ladder for the day.\nInfinite: Play as many as you want, practice mode.',
     },
     {
       title: 'You\'re Ready!',

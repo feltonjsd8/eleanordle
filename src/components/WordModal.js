@@ -77,11 +77,12 @@ const WordModal = ({
     if (!isOpen) return null;
 
     const isDaily = gameMode === 'daily';
+    const isDailyLadder = gameMode === 'daily-ladder';
     const resolvedPrimaryLabel = primaryLabel || (isDaily ? 'Close' : (isSuccess ? 'Next Word' : 'Try Again'));
     const resolvedTitle = title || (isSuccess ? 'Congratulations!' : 'Game Over');
     const showStats = variant === 'result';
     const showDefinitions = Boolean(definition?.definitions?.length);
-    const showTopPrimaryAction = gameMode === 'ladder';
+    const showTopPrimaryAction = gameMode === 'ladder' || gameMode === 'daily-ladder';
 
     return (
         <div className="modal-overlay">
@@ -139,7 +140,7 @@ const WordModal = ({
                         </button>
                     )}
                     <button
-                        className={isDaily ? 'try-again-button' : (isSuccess ? 'next-word-button' : 'try-again-button')}
+                        className={(isDaily || isDailyLadder) ? 'try-again-button' : (isSuccess ? 'next-word-button' : 'try-again-button')}
                         onClick={onNextWord}
                     >
                         {resolvedPrimaryLabel}

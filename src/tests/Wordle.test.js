@@ -10,7 +10,11 @@ jest.mock('../services/dictionaryService', () => ({
     if (length === 6) return Promise.resolve('PLANET');
     return Promise.resolve('GRAPE');
   }),
-  getDictionaryWords: jest.fn(() => Promise.resolve(['APPLE'])),
+  getDictionaryWords: jest.fn((seed = null, length = 5) => {
+    if (length === 4) return Promise.resolve(['MOSS', 'FERN']);
+    if (length === 6) return Promise.resolve(['PLANET', 'SPRING']);
+    return Promise.resolve(['GRAPE', 'APPLE']);
+  }),
   getWordDefinition: jest.fn((word) => Promise.resolve({ word, definitions: [{ definition: `Definition for ${word}` }] })),
   isValidWord: jest.fn(() => Promise.resolve(true)),
 }));
@@ -21,10 +25,25 @@ jest.mock('../services/suggestionService', () => ({
 
 describe('Wordle Component', () => {
   beforeEach(() => {
+    const dictionaryService = require('../services/dictionaryService');
+
     localStorage.clear();
     localStorage.setItem('eleanordle:hasSeenTutorial', 'true');
     jest.clearAllMocks();
     jest.useRealTimers();
+
+    dictionaryService.getRandomWord.mockImplementation((excludeWords = [], length = 5) => {
+      if (length === 4) return Promise.resolve('MOSS');
+      if (length === 6) return Promise.resolve('PLANET');
+      return Promise.resolve('GRAPE');
+    });
+    dictionaryService.getDictionaryWords.mockImplementation((seed = null, length = 5) => {
+      if (length === 4) return Promise.resolve(['MOSS', 'FERN']);
+      if (length === 6) return Promise.resolve(['PLANET', 'SPRING']);
+      return Promise.resolve(['GRAPE', 'APPLE']);
+    });
+    dictionaryService.getWordDefinition.mockImplementation((word) => Promise.resolve({ word, definitions: [{ definition: `Definition for ${word}` }] }));
+    dictionaryService.isValidWord.mockImplementation(() => Promise.resolve(true));
   });
 
   const getTodayKey = () => {
@@ -120,8 +139,61 @@ describe('Wordle Component', () => {
     await waitFor(() => expect(getRandomWord).toHaveBeenNthCalledWith(1, [], 4));
     expect(getRandomWord).toHaveBeenNthCalledWith(2, expect.any(Array), 5);
     expect(getRandomWord).toHaveBeenNthCalledWith(3, [], 6);
-    expect(await screen.findByText('Stage 1 of 3: 4-letter word')).toBeInTheDocument();
+    expect(await screen.findByText(/Stage 1 of 3: 4-letter word/)).toBeInTheDocument();
     expect(screen.getByLabelText('Wordle guess input')).toHaveAttribute('maxlength', '4');
+  });
+
+  it('starts daily ladder mode with the seeded ladder words and daily restrictions', async () => {
+    const { getDictionaryWords, getRandomWord } = require('../services/dictionaryService');
+
+    render(<Wordle />);
+    await screen.findByTitle('Eleanordle');
+
+    fireEvent.click(screen.getByLabelText('Open menu'));
+    fireEvent.click(await screen.findByText('Daily Ladder'));
+
+    await screen.findByText(/Daily Ladder: Stage 1 of 3: 4-letter word/);
+
+    expect(getDictionaryWords).toHaveBeenCalledWith(expect.any(Number), 4);
+    expect(getDictionaryWords).toHaveBeenCalledWith(expect.any(Number), 5);
+    expect(getDictionaryWords).toHaveBeenCalledWith(expect.any(Number), 6);
+    expect(getRandomWord).not.toHaveBeenCalledWith([], 4);
+    expect(screen.getByLabelText('Wordle guess input')).toHaveAttribute('maxlength', '4');
+    expect(screen.queryByLabelText('Suggest Word')).not.toBeInTheDocument();
+  });
+
+  it('advances daily ladder to the 5-letter stage after completing the 4-letter word', async () => {
+    jest.useFakeTimers();
+
+    render(<Wordle />);
+    await screen.findByTitle('Eleanordle');
+
+    fireEvent.click(screen.getByLabelText('Open menu'));
+    fireEvent.click(await screen.findByText('Daily Ladder'));
+    await screen.findByText(/Daily Ladder: Stage 1 of 3: 4-letter word/);
+
+    for (const key of ['M', 'O', 'S', 'S']) {
+      fireEvent.click(screen.getByRole('button', { name: key }));
+    }
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'ENTER' }));
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(1200);
+    });
+
+    const continueButtons = await screen.findAllByRole('button', { name: 'Continue to 5-Letter Word' });
+
+    await act(async () => {
+      fireEvent.click(continueButtons[0]);
+    });
+
+    await screen.findByText(/Daily Ladder: Stage 2 of 3: 5-letter word/);
+    expect(screen.getByLabelText('Wordle guess input')).toHaveAttribute('maxlength', '5');
+
+    jest.useRealTimers();
   });
 
   it('keeps the intended 4-letter guess under rapid onscreen input', async () => {
@@ -138,7 +210,7 @@ describe('Wordle Component', () => {
 
     fireEvent.click(screen.getByLabelText('Open menu'));
     fireEvent.click(await screen.findByText('Ladder'));
-    await screen.findByText('Stage 1 of 3: 4-letter word');
+    await screen.findByText(/Stage 1 of 3: 4-letter word/);
 
     for (const key of ['N', 'E', 'A', 'T']) {
       fireEvent.click(screen.getByRole('button', { name: key }));
@@ -161,7 +233,7 @@ describe('Wordle Component', () => {
 
     fireEvent.click(screen.getByLabelText('Open menu'));
     fireEvent.click(await screen.findByText('Ladder'));
-    await screen.findByText('Stage 1 of 3: 4-letter word');
+    await screen.findByText(/Stage 1 of 3: 4-letter word/);
 
     fireEvent.click(screen.getByLabelText('Suggest Word'));
 

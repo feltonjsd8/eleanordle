@@ -12,9 +12,15 @@ import Logo from './Logo';
 const GAME_MODE_DAILY = 'daily';
 const GAME_MODE_PRACTICE = 'practice';
 const GAME_MODE_LADDER = 'ladder';
+const GAME_MODE_DAILY_LADDER = 'daily-ladder';
 const MAX_GUESSES = 6;
 const DEFAULT_WORD_LENGTH = 5;
 const LADDER_WORD_LENGTHS = [4, 5, 6];
+const DAILY_LADDER_FALLBACK_WORDS = {
+  4: ['MOSS', 'FERN', 'TIDE', 'ARCH'],
+  5: ['GRAPE', 'APPLE', 'RIVER', 'STORM'],
+  6: ['PLANET', 'SPRING', 'MEADOW', 'THRONE'],
+};
 const MODAL_VARIANT_RESULT = 'result';
 const MODAL_VARIANT_LADDER_STAGE = 'ladder-stage';
 const DAILY_STORAGE_MIGRATION_KEY = 'eleanordle:migration:daily-cleanup-v1';
@@ -28,8 +34,19 @@ const createBoardState = (wordLength = DEFAULT_WORD_LENGTH) => ({
 
 const getModeLabel = (mode) => {
   if (mode === GAME_MODE_DAILY) return 'DAILY';
+  if (mode === GAME_MODE_DAILY_LADDER) return 'DAILY';
   if (mode === GAME_MODE_LADDER) return 'LADDER';
   return 'INFINITE';
+};
+
+const isDailyMode = (mode) => mode === GAME_MODE_DAILY || mode === GAME_MODE_DAILY_LADDER;
+
+const isLadderMode = (mode) => mode === GAME_MODE_LADDER || mode === GAME_MODE_DAILY_LADDER;
+
+const getDailyLadderFallbackWord = (dateKey, length) => {
+  const candidates = DAILY_LADDER_FALLBACK_WORDS[length] || DAILY_LADDER_FALLBACK_WORDS[DEFAULT_WORD_LENGTH];
+  const index = hashToUint32(`${GAME_MODE_DAILY_LADDER}:${dateKey}:${length}`) % candidates.length;
+  return candidates[index];
 };
 
 const getLocalDateKey = (date = new Date()) => {
@@ -372,9 +389,11 @@ const Wordle = ({ onBackToMenu }) => {
     event.preventDefault();
   }, []);
 
-  const getDailyTargetStorageKey = (dateKey) => `eleanordle:daily:${dateKey}:targetWord`;
-  const getDailyClueStorageKey = (dateKey) => `eleanordle:daily:${dateKey}:clue`;
-  const getDailyStateStorageKey = (dateKey) => `eleanordle:daily:${dateKey}:state`;
+  const getDailyStoragePrefix = (mode, dateKey) => `eleanordle:${mode}:${dateKey}`;
+  const getDailyTargetStorageKey = (mode, dateKey) => `${getDailyStoragePrefix(mode, dateKey)}:targetWord`;
+  const getDailyClueStorageKey = (mode, dateKey) => `${getDailyStoragePrefix(mode, dateKey)}:clue`;
+  const getDailyStateStorageKey = (mode, dateKey) => `${getDailyStoragePrefix(mode, dateKey)}:state`;
+  const getDailyLadderWordsStorageKey = (dateKey) => `${getDailyStoragePrefix(GAME_MODE_DAILY_LADDER, dateKey)}:words`;
 
   const runDailyStorageCleanupMigration = useCallback(() => {
     try {
@@ -394,7 +413,7 @@ const Wordle = ({ onBackToMenu }) => {
   }, []);
 
   const getOrCreateDailyTargetWord = useCallback((dateKey) => {
-    const key = getDailyTargetStorageKey(dateKey);
+    const key = getDailyTargetStorageKey(GAME_MODE_DAILY, dateKey);
     const seed = hashToUint32(dateKey);
     const idx = seed % DAILY_WORDS.length;
     const canonicalWord = DAILY_WORDS[idx];
@@ -406,14 +425,14 @@ const Wordle = ({ onBackToMenu }) => {
     localStorage.setItem(key, canonicalWord);
     // If the word changed, clear the stale clue so it gets re-fetched
     if (existing && existing !== canonicalWord) {
-      localStorage.removeItem(getDailyClueStorageKey(dateKey));
-      localStorage.removeItem(getDailyStateStorageKey(dateKey));
+      localStorage.removeItem(getDailyClueStorageKey(GAME_MODE_DAILY, dateKey));
+      localStorage.removeItem(getDailyStateStorageKey(GAME_MODE_DAILY, dateKey));
     }
     return canonicalWord;
   }, []);
 
   const getOrCreateDailyClue = useCallback(async (word, dateKey) => {
-    const key = getDailyClueStorageKey(dateKey);
+    const key = getDailyClueStorageKey(GAME_MODE_DAILY, dateKey);
     const existing = localStorage.getItem(key);
     if (existing) {
       const maskedClue = maskWordInText(existing, word);
@@ -435,8 +454,49 @@ const Wordle = ({ onBackToMenu }) => {
     }
   }, []);
 
-  const loadDailySavedState = useCallback((dateKey) => {
-    const raw = localStorage.getItem(getDailyStateStorageKey(dateKey));
+  const getOrCreateDailyLadderWords = useCallback(async (dateKey) => {
+    const key = getDailyLadderWordsStorageKey(dateKey);
+
+    try {
+      const existing = JSON.parse(localStorage.getItem(key) || 'null');
+      const isValidExisting = Array.isArray(existing)
+        && existing.length === LADDER_WORD_LENGTHS.length
+        && existing.every((word, index) => typeof word === 'string' && word.length === LADDER_WORD_LENGTHS[index]);
+
+      if (isValidExisting) {
+        return existing;
+      }
+    } catch {
+      // Ignore malformed cache and rebuild it.
+    }
+
+    const dailyWord = getOrCreateDailyTargetWord(dateKey);
+    const ladderWords = await Promise.all(
+      LADDER_WORD_LENGTHS.map(async (length) => {
+        const seededWords = await getDictionaryWords(hashToUint32(`${dateKey}:${GAME_MODE_DAILY_LADDER}:${length}`), length);
+        const candidateWords = Array.isArray(seededWords)
+          ? seededWords.filter((word) => typeof word === 'string' && word.length === length)
+          : [];
+        const excludedWords = length === DEFAULT_WORD_LENGTH && dailyWord ? new Set([dailyWord]) : new Set();
+        if (candidateWords.length > 0) {
+          return candidateWords.find((word) => !excludedWords.has(word)) || candidateWords[0];
+        }
+
+        const fallbackWord = getDailyLadderFallbackWord(dateKey, length);
+        if (!excludedWords.has(fallbackWord)) {
+          return fallbackWord;
+        }
+
+        return getRandomWord(Array.from(excludedWords), length);
+      })
+    );
+
+    localStorage.setItem(key, JSON.stringify(ladderWords));
+    return ladderWords;
+  }, [getOrCreateDailyTargetWord]);
+
+  const loadDailySavedState = useCallback((mode, dateKey) => {
+    const raw = localStorage.getItem(getDailyStateStorageKey(mode, dateKey));
     if (!raw) return null;
     try {
       return JSON.parse(raw);
@@ -445,10 +505,10 @@ const Wordle = ({ onBackToMenu }) => {
     }
   }, []);
 
-  const saveDailyState = useCallback((dateKey, nextState) => {
+  const saveDailyState = useCallback((mode, dateKey, nextState) => {
     const payload = {
       // daily identity
-      gameMode: GAME_MODE_DAILY,
+      gameMode: mode,
       dailyDateKey: dateKey,
 
       // gameplay
@@ -456,20 +516,26 @@ const Wordle = ({ onBackToMenu }) => {
       currentGuess: nextState.currentGuess,
       currentRow: nextState.currentRow,
       targetWord: nextState.targetWord,
+      activeWordLength: nextState.activeWordLength,
       gameOver: nextState.gameOver,
       isSuccess: nextState.isSuccess,
       completedWord: nextState.completedWord,
       evaluations: nextState.evaluations,
       letterStates: nextState.letterStates,
+      ladderWords: nextState.ladderWords,
+      ladderStageIndex: nextState.ladderStageIndex,
+      ladderCompletedStages: nextState.ladderCompletedStages,
+      ladderGuessCounts: nextState.ladderGuessCounts,
+      ladderTotalGuesses: nextState.ladderTotalGuesses,
 
       // clue (avoid extra API calls)
       clue: nextState.clue,
       showClue: nextState.showClue,
 
       // Keep revealedLetters empty so we don’t replay flip animations on reload
-      revealedLetters: createBoardState(DEFAULT_WORD_LENGTH).revealedLetters,
+      revealedLetters: createBoardState(nextState.activeWordLength || DEFAULT_WORD_LENGTH).revealedLetters,
     };
-    localStorage.setItem(getDailyStateStorageKey(dateKey), JSON.stringify(payload));
+    localStorage.setItem(getDailyStateStorageKey(mode, dateKey), JSON.stringify(payload));
   }, []);
 
   const loadClueForWord = useCallback(async (word) => {
@@ -491,16 +557,17 @@ const Wordle = ({ onBackToMenu }) => {
     dispatch({ type: 'SET_MODAL_PROGRESS_LABEL', modalProgressLabel: '' });
   }, []);
 
-  const startLadderStage = useCallback(async ({ ladderWords, stageIndex, completedStages, guessCounts, totalGuesses }) => {
+  const startLadderStage = useCallback(async ({ ladderWords, stageIndex, completedStages, guessCounts, totalGuesses, gameMode = GAME_MODE_LADDER, dailyDateKey = getLocalDateKey() }) => {
     const targetWord = ladderWords[stageIndex];
-    const stats = loadStats(GAME_MODE_LADDER);
+    const stats = loadStats(gameMode);
     dispatch({
       type: 'RESET',
       targetWord,
       wordLength: targetWord.length,
       keepStreak: false,
       resetStreak: true,
-      gameMode: GAME_MODE_LADDER,
+      gameMode,
+      dailyDateKey,
       ladderWords,
       ladderStageIndex: stageIndex,
       ladderCompletedStages: completedStages,
@@ -520,7 +587,7 @@ const Wordle = ({ onBackToMenu }) => {
     dispatch({ type: 'SET_IS_LOADING', isLoading: true });
     try {
       const todayKey = getLocalDateKey();
-      const dailyWord = localStorage.getItem(getDailyTargetStorageKey(todayKey));
+      const dailyWord = localStorage.getItem(getDailyTargetStorageKey(GAME_MODE_DAILY, todayKey));
       const exclude = dailyWord ? [dailyWord] : [];
       const newWord = await getRandomWord(exclude, DEFAULT_WORD_LENGTH);
       dispatch({
@@ -547,7 +614,7 @@ const Wordle = ({ onBackToMenu }) => {
     dispatch({ type: 'SET_IS_LOADING', isLoading: true });
     try {
       const todayKey = getLocalDateKey();
-      const dailyWord = localStorage.getItem(getDailyTargetStorageKey(todayKey));
+      const dailyWord = localStorage.getItem(getDailyTargetStorageKey(GAME_MODE_DAILY, todayKey));
       const ladderWords = await Promise.all(
         LADDER_WORD_LENGTHS.map((length) => {
           const exclude = length === DEFAULT_WORD_LENGTH && dailyWord ? [dailyWord] : [];
@@ -570,13 +637,65 @@ const Wordle = ({ onBackToMenu }) => {
     }
   }, [refocusGameInput, startLadderStage]);
 
+  const startDailyLadderGame = useCallback(async (dateKey) => {
+    dispatch({ type: 'SET_IS_LOADING', isLoading: true });
+    try {
+      const normalizedDateKey = dateKey || getLocalDateKey();
+      const ladderWords = await getOrCreateDailyLadderWords(normalizedDateKey);
+      const saved = loadDailySavedState(GAME_MODE_DAILY_LADDER, normalizedDateKey);
+
+      if (
+        saved
+        && saved.gameMode === GAME_MODE_DAILY_LADDER
+        && Array.isArray(saved.ladderWords)
+        && JSON.stringify(saved.ladderWords) === JSON.stringify(ladderWords)
+      ) {
+        const activeWordLength = saved.activeWordLength || saved.targetWord?.length || DEFAULT_WORD_LENGTH;
+        const hydrated = {
+          ...initialState,
+          ...saved,
+          gameMode: GAME_MODE_DAILY_LADDER,
+          dailyDateKey: normalizedDateKey,
+          ladderWords,
+          targetWord: saved.targetWord || ladderWords[saved.ladderStageIndex || 0],
+          activeWordLength,
+          guesses: saved.guesses || Array(MAX_GUESSES).fill(''),
+          evaluations: saved.evaluations || Array(MAX_GUESSES).fill(null),
+          revealedLetters: createBoardState(activeWordLength).revealedLetters,
+          letterStates: saved.letterStates || computeLetterStatesFromHistory(
+            saved.guesses || Array(MAX_GUESSES).fill(''),
+            saved.evaluations || Array(MAX_GUESSES).fill(null)
+          ),
+        };
+        dispatch({ type: 'LOAD_SAVED_GAME', saved: hydrated });
+        dispatch({ type: 'SET_STATS', stats: loadStats(GAME_MODE_DAILY_LADDER) });
+      } else {
+        await startLadderStage({
+          ladderWords,
+          stageIndex: 0,
+          completedStages: [],
+          guessCounts: [],
+          totalGuesses: 0,
+          gameMode: GAME_MODE_DAILY_LADDER,
+          dailyDateKey: normalizedDateKey,
+        });
+      }
+    } catch (error) {
+      console.error('Error starting daily ladder game:', error);
+      showMessage('Error loading daily ladder. Please try again.');
+    } finally {
+      dispatch({ type: 'SET_IS_LOADING', isLoading: false });
+      refocusGameInput();
+    }
+  }, [getOrCreateDailyLadderWords, loadDailySavedState, refocusGameInput, startLadderStage]);
+
   const startDailyGame = useCallback(async (dateKey) => {
     dispatch({ type: 'SET_IS_LOADING', isLoading: true });
     try {
       const normalizedDateKey = dateKey || getLocalDateKey();
       const targetWord = getOrCreateDailyTargetWord(normalizedDateKey);
 
-      const saved = loadDailySavedState(normalizedDateKey);
+      const saved = loadDailySavedState(GAME_MODE_DAILY, normalizedDateKey);
       if (saved && saved.targetWord === targetWord) {
         const hydrated = {
           ...initialState,
@@ -637,9 +756,9 @@ const Wordle = ({ onBackToMenu }) => {
   }, [refocusGameInput]);
 
   useEffect(() => {
-    if (state.gameMode !== GAME_MODE_DAILY) return;
+    if (!isDailyMode(state.gameMode)) return;
     // Persist after meaningful changes.
-    saveDailyState(state.dailyDateKey, state);
+    saveDailyState(state.gameMode, state.dailyDateKey, state);
   }, [
     state.gameMode,
     state.dailyDateKey,
@@ -723,7 +842,7 @@ const Wordle = ({ onBackToMenu }) => {
   };
 
   const handleNextWord = useCallback(async () => {
-    if (state.gameMode === GAME_MODE_LADDER) {
+    if (isLadderMode(state.gameMode)) {
       if (state.modalVariant === MODAL_VARIANT_LADDER_STAGE) {
         await startLadderStage({
           ladderWords: state.ladderWords,
@@ -731,7 +850,13 @@ const Wordle = ({ onBackToMenu }) => {
           completedStages: state.ladderCompletedStages,
           guessCounts: state.ladderGuessCounts,
           totalGuesses: state.ladderTotalGuesses,
+          gameMode: state.gameMode,
+          dailyDateKey: state.dailyDateKey,
         });
+        return;
+      }
+      if (state.gameMode === GAME_MODE_DAILY_LADDER) {
+        resetModalState();
         return;
       }
       await startLadderGame();
@@ -872,11 +997,11 @@ const Wordle = ({ onBackToMenu }) => {
 
     if (state.currentGuess === state.targetWord) {
       const winGuessCount = state.currentRow + 1;
-      const winDailyKey = state.gameMode === GAME_MODE_DAILY ? state.dailyDateKey : null;
+      const winDailyKey = isDailyMode(state.gameMode) ? state.dailyDateKey : null;
       const nextGuessCounts = [...state.ladderGuessCounts, winGuessCount];
       const nextCompletedStages = [...state.ladderCompletedStages, state.targetWord];
       const nextTotalGuesses = state.ladderTotalGuesses + winGuessCount;
-      const isFinalLadderStage = state.gameMode === GAME_MODE_LADDER && state.ladderStageIndex === LADDER_WORD_LENGTHS.length - 1;
+      const isFinalLadderStage = isLadderMode(state.gameMode) && state.ladderStageIndex === LADDER_WORD_LENGTHS.length - 1;
 
       setTimeout(async () => {
         dispatch({ type: 'SET_GAME_OVER', gameOver: true });
@@ -897,13 +1022,18 @@ const Wordle = ({ onBackToMenu }) => {
         definitionCache.current[state.targetWord] = definition;
         dispatch({ type: 'SET_WORD_DEFINITION', wordDefinition: definition });
 
-        if (state.gameMode === GAME_MODE_LADDER) {
+        if (isLadderMode(state.gameMode)) {
           if (isFinalLadderStage) {
-            const updatedStats = recordGameResult({ isSuccess: true, guessCount: nextTotalGuesses, mode: GAME_MODE_LADDER });
+            const updatedStats = recordGameResult({
+              isSuccess: true,
+              guessCount: nextTotalGuesses,
+              dailyDateKey: state.gameMode === GAME_MODE_DAILY_LADDER ? state.dailyDateKey : null,
+              mode: state.gameMode,
+            });
             dispatch({ type: 'SET_STATS', stats: updatedStats });
             dispatch({ type: 'SET_MODAL_VARIANT', modalVariant: MODAL_VARIANT_RESULT });
-            dispatch({ type: 'SET_MODAL_TITLE', modalTitle: 'Ladder Complete!' });
-            dispatch({ type: 'SET_MODAL_ACTION_LABEL', modalActionLabel: 'Play Again' });
+            dispatch({ type: 'SET_MODAL_TITLE', modalTitle: state.gameMode === GAME_MODE_DAILY_LADDER ? 'Daily Ladder Complete!' : 'Ladder Complete!' });
+            dispatch({ type: 'SET_MODAL_ACTION_LABEL', modalActionLabel: state.gameMode === GAME_MODE_DAILY_LADDER ? 'Close' : 'Play Again' });
             dispatch({ type: 'SET_MODAL_PROGRESS_LABEL', modalProgressLabel: `Solved all ${LADDER_WORD_LENGTHS.length} stages in ${nextTotalGuesses} guesses.` });
           } else {
             const nextLength = LADDER_WORD_LENGTHS[state.ladderStageIndex + 1];
@@ -923,17 +1053,22 @@ const Wordle = ({ onBackToMenu }) => {
         dispatch({ type: 'SET_SHOW_MODAL', showModal: true });
       }, revealDelay);
     } else if (state.currentRow === MAX_GUESSES - 1) {
-      const lossDailyKey = state.gameMode === GAME_MODE_DAILY ? state.dailyDateKey : null;
+      const lossDailyKey = isDailyMode(state.gameMode) ? state.dailyDateKey : null;
       setTimeout(async () => {
         dispatch({ type: 'SET_GAME_OVER', gameOver: true });
         dispatch({ type: 'SET_COMPLETED_WORD', completedWord: state.targetWord });
         dispatch({ type: 'RESET_STREAK' });
         dispatch({ type: 'SET_IS_SUCCESS', isSuccess: false });
         let updatedStats;
-        if (state.gameMode === GAME_MODE_LADDER) {
-          updatedStats = recordGameResult({ isSuccess: false, guessCount: state.ladderTotalGuesses + MAX_GUESSES, mode: GAME_MODE_LADDER });
-          dispatch({ type: 'SET_MODAL_TITLE', modalTitle: 'Ladder Failed' });
-          dispatch({ type: 'SET_MODAL_ACTION_LABEL', modalActionLabel: 'Try New Ladder' });
+        if (isLadderMode(state.gameMode)) {
+          updatedStats = recordGameResult({
+            isSuccess: false,
+            guessCount: state.ladderTotalGuesses + MAX_GUESSES,
+            dailyDateKey: state.gameMode === GAME_MODE_DAILY_LADDER ? state.dailyDateKey : null,
+            mode: state.gameMode,
+          });
+          dispatch({ type: 'SET_MODAL_TITLE', modalTitle: state.gameMode === GAME_MODE_DAILY_LADDER ? 'Daily Ladder Failed' : 'Ladder Failed' });
+          dispatch({ type: 'SET_MODAL_ACTION_LABEL', modalActionLabel: state.gameMode === GAME_MODE_DAILY_LADDER ? 'Close' : 'Try New Ladder' });
           dispatch({ type: 'SET_MODAL_PROGRESS_LABEL', modalProgressLabel: `Reached the ${state.activeWordLength}-letter stage.` });
         } else {
           updatedStats = recordGameResult({ isSuccess: false, guessCount: MAX_GUESSES, dailyDateKey: lossDailyKey, mode: state.gameMode });
@@ -1010,7 +1145,7 @@ const Wordle = ({ onBackToMenu }) => {
 
   const revealAnswer = async () => {
     if (state.gameOver) return;
-    if (state.gameMode === GAME_MODE_DAILY) {
+    if (isDailyMode(state.gameMode)) {
       showMessage('Daily mode: no reveals');
       dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
       return;
@@ -1144,12 +1279,16 @@ const Wordle = ({ onBackToMenu }) => {
           if (!state.showClue) getClue();
         } else if (e.key.toLowerCase() === 's') {
           e.preventDefault();
-          if (state.gameMode !== GAME_MODE_DAILY) handleShowSuggestions();
+          if (!isDailyMode(state.gameMode)) handleShowSuggestions();
         } else if (e.key.toLowerCase() === 'n') {
           e.preventDefault();
-          if (state.gameMode === GAME_MODE_DAILY) {
-            localStorage.removeItem(getDailyStateStorageKey(state.dailyDateKey));
-            startDailyGame(state.dailyDateKey);
+          if (isDailyMode(state.gameMode)) {
+            localStorage.removeItem(getDailyStateStorageKey(state.gameMode, state.dailyDateKey));
+            if (state.gameMode === GAME_MODE_DAILY_LADDER) {
+              startDailyLadderGame(state.dailyDateKey);
+            } else {
+              startDailyGame(state.dailyDateKey);
+            }
           } else if (state.gameMode === GAME_MODE_LADDER) {
             startLadderGame();
           } else {
@@ -1163,7 +1302,7 @@ const Wordle = ({ onBackToMenu }) => {
     };
     window.addEventListener('keydown', handleMenuShortcuts);
     return () => window.removeEventListener('keydown', handleMenuShortcuts);
-  }, [state.showClue, state.gameMode, state.dailyDateKey, getClue, handleShowSuggestions, startDailyGame, startLadderGame, startPracticeGame, revealAnswer]);
+  }, [state.showClue, state.gameMode, state.dailyDateKey, getClue, handleShowSuggestions, startDailyGame, startDailyLadderGame, startLadderGame, startPracticeGame, revealAnswer]);
 
   useEffect(() => {
     if (state.animateStreak) {
@@ -1265,14 +1404,14 @@ const Wordle = ({ onBackToMenu }) => {
             {letter}
           </span>
         ))}
-        <span className="sr-only">{state.gameMode === GAME_MODE_DAILY ? 'Daily mode' : state.gameMode === GAME_MODE_LADDER ? 'Ladder mode' : 'Infinite mode'}</span>
+        <span className="sr-only">{state.gameMode === GAME_MODE_DAILY ? 'Daily mode' : state.gameMode === GAME_MODE_DAILY_LADDER ? 'Daily ladder mode' : state.gameMode === GAME_MODE_LADDER ? 'Ladder mode' : 'Infinite mode'}</span>
       </div>
       <div className="game-header">
         <div className="header-content">
           <h1><Logo /></h1>
         </div>
         <div className="header-actions">
-          {state.gameMode !== GAME_MODE_DAILY && (
+          {!isDailyMode(state.gameMode) && (
             <button
               onClick={handleShowSuggestions}
               onMouseDown={preventButtonFocus}
@@ -1359,6 +1498,16 @@ const Wordle = ({ onBackToMenu }) => {
                   onMouseDown={preventButtonFocus}
                   onClick={() => {
                     dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
+                    startDailyLadderGame(getLocalDateKey());
+                  }}
+                  className="dropdown-item"
+                >
+                  Daily Ladder
+                </button>
+                <button
+                  onMouseDown={preventButtonFocus}
+                  onClick={() => {
+                    dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
                     startPracticeGame(true);
                   }}
                   className="dropdown-item"
@@ -1431,9 +1580,9 @@ const Wordle = ({ onBackToMenu }) => {
       )}
       {state.isLoading && <div className="loading">Loading words...</div>}
       <div className="game-container">
-        {state.gameMode === GAME_MODE_LADDER && (
+        {isLadderMode(state.gameMode) && (
           <div className="ladder-progress">
-            Stage {state.ladderStageIndex + 1} of {LADDER_WORD_LENGTHS.length}: {state.activeWordLength}-letter word
+            {state.gameMode === GAME_MODE_DAILY_LADDER ? 'Daily Ladder' : 'Ladder'}: Stage {state.ladderStageIndex + 1} of {LADDER_WORD_LENGTHS.length}: {state.activeWordLength}-letter word
           </div>
         )}
         <div className="wordle-grid" style={{ gridTemplateRows: `repeat(${MAX_GUESSES}, 1fr)` }}>

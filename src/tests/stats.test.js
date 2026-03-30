@@ -61,10 +61,12 @@ describe('statsService', () => {
     recordGameResult({ isSuccess: true, guessCount: 2, dailyDateKey: '2026-03-01', mode: 'daily' });
     recordGameResult({ isSuccess: false, guessCount: 6, mode: 'practice' });
     recordGameResult({ isSuccess: true, guessCount: 9, mode: 'ladder' });
+    recordGameResult({ isSuccess: true, guessCount: 8, dailyDateKey: '2026-03-01', mode: 'daily-ladder' });
 
     const dailyStats = loadStats('daily');
     const practiceStats = loadStats('practice');
     const ladderStats = loadStats('ladder');
+    const dailyLadderStats = loadStats('daily-ladder');
 
     expect(dailyStats.played).toBe(1);
     expect(dailyStats.won).toBe(1);
@@ -77,6 +79,10 @@ describe('statsService', () => {
     expect(ladderStats.played).toBe(1);
     expect(ladderStats.won).toBe(1);
     expect(ladderStats.guessDistribution[9]).toBe(1);
+
+    expect(dailyLadderStats.played).toBe(1);
+    expect(dailyLadderStats.won).toBe(1);
+    expect(dailyLadderStats.guessDistribution[8]).toBe(1);
   });
 
   it('persists stats to localStorage', () => {
@@ -103,5 +109,13 @@ describe('statsService', () => {
     expect(stats.won).toBe(2);
     expect(stats.currentStreak).toBe(0);
     expect(stats.maxStreak).toBe(2);
+  });
+
+  it('does not double-count a daily ladder run on the same date', () => {
+    recordGameResult({ isSuccess: true, guessCount: 8, dailyDateKey: '2026-03-01', mode: 'daily-ladder' });
+    const stats = recordGameResult({ isSuccess: false, guessCount: 12, dailyDateKey: '2026-03-01', mode: 'daily-ladder' });
+
+    expect(stats.played).toBe(1);
+    expect(stats.won).toBe(1);
   });
 });
