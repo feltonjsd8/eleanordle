@@ -1,62 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/TutorialModal.css';
 
+const TUTORIALS = [
+  {
+    title: 'Welcome to Eleanordle',
+    subtitle: 'A word puzzle game',
+    description: 'You have 6 tries to guess a 5-letter word. After each guess, tiles change color to show how close you are.',
+  },
+  {
+    title: 'Guess the Word',
+    subtitle: 'Type your first guess',
+    description: 'Start with a common 5-letter word. Use the keyboard to type and press ENTER to submit.',
+  },
+  {
+    title: 'Learn from Colors',
+    subtitle: 'Read the feedback',
+    description: 'Green = correct letter in correct spot\nYellow = correct letter in wrong spot\nGray = letter not in word',
+    showExample: true,
+    exampleWord: 'REACT',
+    exampleGuess: 'STARE',
+    exampleEvals: ['incorrect', 'wrong-position', 'wrong-position', 'wrong-position', 'correct'],
+  },
+  {
+    title: 'Use the Clue',
+    subtitle: 'Need a hint?',
+    description: 'A definition clue appears at the top to help you. You can toggle it on or off anytime.',
+  },
+  {
+    title: 'Keep Guessing',
+    subtitle: 'Narrow it down',
+    description: 'Use the information from previous guesses to make better guesses. Each guess gets you closer!',
+  },
+  {
+    title: 'Daily, Daily Ladder & Infinite',
+    subtitle: 'Three ways to play',
+    description: 'Daily: One new puzzle each day, shareable results.\nDaily Ladder: A fixed 4, 5, 6-letter ladder for the day.\nInfinite: Play as many as you want, practice mode.',
+  },
+  {
+    title: 'You\'re Ready!',
+    subtitle: 'Start playing',
+    description: 'You now know the basics. Good luck, and have fun solving!',
+  },
+];
+
 const TutorialModal = ({ isOpen, onClose }) => {
   const [step, setStep] = useState(0);
-  const [animateExample, setAnimateExample] = useState(false);
   const [revealedTiles, setRevealedTiles] = useState(Array(5).fill(false));
 
-  const tutorials = [
-    {
-      title: 'Welcome to Eleanordle',
-      subtitle: 'A word puzzle game',
-      description: 'You have 6 tries to guess a 5-letter word. After each guess, tiles change color to show how close you are.',
-    },
-    {
-      title: 'Guess the Word',
-      subtitle: 'Type your first guess',
-      description: 'Start with a common 5-letter word. Use the keyboard to type and press ENTER to submit.',
-    },
-    {
-      title: 'Learn from Colors',
-      subtitle: 'Read the feedback',
-      description: 'Green = correct letter in correct spot\nYellow = correct letter in wrong spot\nGray = letter not in word',
-      showExample: true,
-      exampleWord: 'REACT',
-      exampleGuess: 'STARE',
-      exampleEvals: ['incorrect', 'wrong-position', 'wrong-position', 'wrong-position', 'correct'],
-    },
-    {
-      title: 'Use the Clue',
-      subtitle: 'Need a hint?',
-      description: 'A definition clue appears at the top to help you. You can toggle it on or off anytime.',
-    },
-    {
-      title: 'Keep Guessing',
-      subtitle: 'Narrow it down',
-      description: 'Use the information from previous guesses to make better guesses. Each guess gets you closer!',
-    },
-    {
-      title: 'Daily, Daily Ladder & Infinite',
-      subtitle: 'Three ways to play',
-      description: 'Daily: One new puzzle each day, shareable results.\nDaily Ladder: A fixed 4, 5, 6-letter ladder for the day.\nInfinite: Play as many as you want, practice mode.',
-    },
-    {
-      title: 'You\'re Ready!',
-      subtitle: 'Start playing',
-      description: 'You now know the basics. Good luck, and have fun solving!',
-    },
-  ];
-
   useEffect(() => {
-    if (tutorials[step]?.showExample && isOpen) {
-      setAnimateExample(false);
+    if (TUTORIALS[step]?.showExample && isOpen) {
       const timer = setTimeout(() => {
-        setAnimateExample(true);
         setRevealedTiles(Array(5).fill(false));
         
         // Animate tiles revealing
-        tutorials[step].exampleEvals.forEach((_, idx) => {
+        TUTORIALS[step].exampleEvals.forEach((_, idx) => {
           setTimeout(() => {
             setRevealedTiles(prev => {
               const newRevealed = [...prev];
@@ -70,8 +67,8 @@ const TutorialModal = ({ isOpen, onClose }) => {
     }
   }, [step, isOpen]);
 
-  const currentSlide = tutorials[step];
-  const isLastStep = step === tutorials.length - 1;
+  const currentSlide = TUTORIALS[step];
+  const isLastStep = step === TUTORIALS.length - 1;
 
   const handleNext = () => {
     if (isLastStep) {
@@ -151,7 +148,7 @@ const TutorialModal = ({ isOpen, onClose }) => {
 
         <div className="tutorial-footer">
           <div className="tutorial-steps">
-            {tutorials.map((_, idx) => (
+            {TUTORIALS.map((_, idx) => (
               <button
                 key={idx}
                 className={`step-dot ${idx === step ? 'active' : ''}`}

@@ -12,6 +12,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-scripts": "5.0.1",
+    "sql.js": "^1.13.0",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
@@ -20,7 +21,12 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d build"
+    "deploy": "gh-pages -d build",
+    "db:populate": "node scripts/gameDb.mjs populate",
+    "db:migrate": "node scripts/gameDb.mjs migrate",
+    "db:prune": "node scripts/gameDb.mjs prune",
+    "db:upsert": "node scripts/gameDb.mjs upsert",
+    "db:disable": "node scripts/gameDb.mjs disable"
   },
   "eslintConfig": {
     "extends": [

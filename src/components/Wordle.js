@@ -1,7 +1,13 @@
-import React, { useReducer, useEffect, useRef, useCallback } from 'react';
+import React, { useReducer, useEffect, useRef, useCallback, useState } from 'react';
 import '../styles/Wordle.css';
-import { getRandomWord, getWordDefinition, isValidWord, getDictionaryWords } from '../services/dictionaryService';
-import DAILY_WORDS from '../services/wordList';
+import {
+  getRandomWord,
+  getWordDefinition,
+  isValidWord,
+  getDictionaryWords,
+  getDailyWordRecord,
+  getDailyLadderWords,
+} from '../services/dictionaryService';
 import { loadStats, recordGameResult } from '../services/statsService';
 import { maskWordInText } from '../services/textMasking';
 import WordModal from './WordModal';
@@ -16,11 +22,6 @@ const GAME_MODE_DAILY_LADDER = 'daily-ladder';
 const MAX_GUESSES = 6;
 const DEFAULT_WORD_LENGTH = 5;
 const LADDER_WORD_LENGTHS = [4, 5, 6];
-const DAILY_LADDER_FALLBACK_WORDS = {
-  4: ['MOSS', 'FERN', 'TIDE', 'ARCH'],
-  5: ['GRAPE', 'APPLE', 'RIVER', 'STORM'],
-  6: ['PLANET', 'SPRING', 'MEADOW', 'THRONE'],
-};
 const MODAL_VARIANT_RESULT = 'result';
 const MODAL_VARIANT_LADDER_STAGE = 'ladder-stage';
 const DAILY_STORAGE_MIGRATION_KEY = 'eleanordle:migration:daily-cleanup-v1';
@@ -39,15 +40,15 @@ const getModeLabel = (mode) => {
   return 'INFINITE';
 };
 
+const getDailyStoragePrefix = (mode, dateKey) => `eleanordle:${mode}:${dateKey}`;
+const getDailyTargetStorageKey = (mode, dateKey) => `${getDailyStoragePrefix(mode, dateKey)}:targetWord`;
+const getDailyClueStorageKey = (mode, dateKey) => `${getDailyStoragePrefix(mode, dateKey)}:clue`;
+const getDailyStateStorageKey = (mode, dateKey) => `${getDailyStoragePrefix(mode, dateKey)}:state`;
+const getDailyLadderWordsStorageKey = (dateKey) => `${getDailyStoragePrefix(GAME_MODE_DAILY_LADDER, dateKey)}:words`;
+
 const isDailyMode = (mode) => mode === GAME_MODE_DAILY || mode === GAME_MODE_DAILY_LADDER;
 
 const isLadderMode = (mode) => mode === GAME_MODE_LADDER || mode === GAME_MODE_DAILY_LADDER;
-
-const getDailyLadderFallbackWord = (dateKey, length) => {
-  const candidates = DAILY_LADDER_FALLBACK_WORDS[length] || DAILY_LADDER_FALLBACK_WORDS[DEFAULT_WORD_LENGTH];
-  const index = hashToUint32(`${GAME_MODE_DAILY_LADDER}:${dateKey}:${length}`) % candidates.length;
-  return candidates[index];
-};
 
 const getLocalDateKey = (date = new Date()) => {
   const year = date.getUTCFullYear();
@@ -126,6 +127,28 @@ const computeLetterStatesFromHistory = (guesses, evaluations) => {
     }
   }
   return states;
+};
+
+const evaluateGuess = (guess, target) => {
+  const evaluation = Array(target.length).fill('incorrect');
+  const targetLetters = target.split('');
+  const guessLetters = guess.split('');
+  for (let i = 0; i < target.length; i++) {
+    if (guessLetters[i] === targetLetters[i]) {
+      evaluation[i] = 'correct';
+      targetLetters[i] = null;
+      guessLetters[i] = null;
+    }
+  }
+  for (let i = 0; i < target.length; i++) {
+    if (guessLetters[i] === null) continue;
+    const targetIndex = targetLetters.indexOf(guessLetters[i]);
+    if (targetIndex !== -1) {
+      evaluation[i] = 'wrong-position';
+      targetLetters[targetIndex] = null;
+    }
+  }
+  return evaluation;
 };
 
 const initialState = {
@@ -370,10 +393,20 @@ function reducer(state, action) {
 
 const Wordle = ({ onBackToMenu }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const [dailyMenuOpen, setDailyMenuOpen] = useState(false);
+  const [infiniteMenuOpen, setInfiniteMenuOpen] = useState(false);
+  const [optionsMenuOpen, setOptionsMenuOpen] = useState(false);
   const inputRef = useRef();
   const menuRef = useRef();
   // Cache for word definitions to avoid unnecessary API calls
   const definitionCache = useRef({});
+
+  const closeMenu = useCallback(() => {
+    dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
+    setDailyMenuOpen(false);
+    setInfiniteMenuOpen(false);
+    setOptionsMenuOpen(false);
+  }, []);
 
   const refocusGameInput = useCallback(() => {
     const activeElement = document.activeElement;
@@ -388,12 +421,6 @@ const Wordle = ({ onBackToMenu }) => {
   const preventButtonFocus = useCallback((event) => {
     event.preventDefault();
   }, []);
-
-  const getDailyStoragePrefix = (mode, dateKey) => `eleanordle:${mode}:${dateKey}`;
-  const getDailyTargetStorageKey = (mode, dateKey) => `${getDailyStoragePrefix(mode, dateKey)}:targetWord`;
-  const getDailyClueStorageKey = (mode, dateKey) => `${getDailyStoragePrefix(mode, dateKey)}:clue`;
-  const getDailyStateStorageKey = (mode, dateKey) => `${getDailyStoragePrefix(mode, dateKey)}:state`;
-  const getDailyLadderWordsStorageKey = (dateKey) => `${getDailyStoragePrefix(GAME_MODE_DAILY_LADDER, dateKey)}:words`;
 
   const runDailyStorageCleanupMigration = useCallback(() => {
     try {
@@ -412,18 +439,16 @@ const Wordle = ({ onBackToMenu }) => {
     }
   }, []);
 
-  const getOrCreateDailyTargetWord = useCallback((dateKey) => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const getOrCreateDailyTargetWord = useCallback(async (dateKey) => {
     const key = getDailyTargetStorageKey(GAME_MODE_DAILY, dateKey);
-    const seed = hashToUint32(dateKey);
-    const idx = seed % DAILY_WORDS.length;
-    const canonicalWord = DAILY_WORDS[idx];
+    const dailyRecord = await getDailyWordRecord(dateKey);
+    const canonicalWord = dailyRecord.word;
 
     const existing = localStorage.getItem(key);
-    // Enforce the canonical word for this date. This fixes stale caches from older builds/logic.
     if (existing === canonicalWord) return existing;
 
     localStorage.setItem(key, canonicalWord);
-    // If the word changed, clear the stale clue so it gets re-fetched
     if (existing && existing !== canonicalWord) {
       localStorage.removeItem(getDailyClueStorageKey(GAME_MODE_DAILY, dateKey));
       localStorage.removeItem(getDailyStateStorageKey(GAME_MODE_DAILY, dateKey));
@@ -431,7 +456,8 @@ const Wordle = ({ onBackToMenu }) => {
     return canonicalWord;
   }, []);
 
-  const getOrCreateDailyClue = useCallback(async (word, dateKey) => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const getOrCreateDailyClue = useCallback(async (word, dateKey, dailyRecord = null) => {
     const key = getDailyClueStorageKey(GAME_MODE_DAILY, dateKey);
     const existing = localStorage.getItem(key);
     if (existing) {
@@ -443,7 +469,9 @@ const Wordle = ({ onBackToMenu }) => {
     }
 
     try {
-      const def = await getWordDefinition(word);
+      const def = dailyRecord?.definition
+        ? { definitions: [{ definition: dailyRecord.definition }] }
+        : await getWordDefinition(word);
       const clue = getClueForDaily(def.definitions, dateKey, word);
       localStorage.setItem(key, clue);
       return clue;
@@ -454,6 +482,7 @@ const Wordle = ({ onBackToMenu }) => {
     }
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const getOrCreateDailyLadderWords = useCallback(async (dateKey) => {
     const key = getDailyLadderWordsStorageKey(dateKey);
 
@@ -470,31 +499,13 @@ const Wordle = ({ onBackToMenu }) => {
       // Ignore malformed cache and rebuild it.
     }
 
-    const dailyWord = getOrCreateDailyTargetWord(dateKey);
-    const ladderWords = await Promise.all(
-      LADDER_WORD_LENGTHS.map(async (length) => {
-        const seededWords = await getDictionaryWords(hashToUint32(`${dateKey}:${GAME_MODE_DAILY_LADDER}:${length}`), length);
-        const candidateWords = Array.isArray(seededWords)
-          ? seededWords.filter((word) => typeof word === 'string' && word.length === length)
-          : [];
-        const excludedWords = length === DEFAULT_WORD_LENGTH && dailyWord ? new Set([dailyWord]) : new Set();
-        if (candidateWords.length > 0) {
-          return candidateWords.find((word) => !excludedWords.has(word)) || candidateWords[0];
-        }
-
-        const fallbackWord = getDailyLadderFallbackWord(dateKey, length);
-        if (!excludedWords.has(fallbackWord)) {
-          return fallbackWord;
-        }
-
-        return getRandomWord(Array.from(excludedWords), length);
-      })
-    );
+    const ladderWords = await getDailyLadderWords(dateKey);
 
     localStorage.setItem(key, JSON.stringify(ladderWords));
     return ladderWords;
-  }, [getOrCreateDailyTargetWord]);
+  }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const loadDailySavedState = useCallback((mode, dateKey) => {
     const raw = localStorage.getItem(getDailyStateStorageKey(mode, dateKey));
     if (!raw) return null;
@@ -505,6 +516,7 @@ const Wordle = ({ onBackToMenu }) => {
     }
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const saveDailyState = useCallback((mode, dateKey, nextState) => {
     const payload = {
       // daily identity
@@ -557,6 +569,11 @@ const Wordle = ({ onBackToMenu }) => {
     dispatch({ type: 'SET_MODAL_PROGRESS_LABEL', modalProgressLabel: '' });
   }, []);
 
+  const showMessage = useCallback((msg) => {
+    dispatch({ type: 'SET_MESSAGE', message: msg });
+    setTimeout(() => dispatch({ type: 'SET_MESSAGE', message: '' }), 2000);
+  }, []);
+
   const startLadderStage = useCallback(async ({ ladderWords, stageIndex, completedStages, guessCounts, totalGuesses, gameMode = GAME_MODE_LADDER, dailyDateKey = getLocalDateKey() }) => {
     const targetWord = ladderWords[stageIndex];
     const stats = loadStats(gameMode);
@@ -579,7 +596,7 @@ const Wordle = ({ onBackToMenu }) => {
     await loadClueForWord(targetWord);
   }, [loadClueForWord, resetModalState]);
 
-  const startPracticeGame = async (resetStreak = false, animate = false) => {
+  const startPracticeGame = useCallback(async (resetStreak = false, animate = false) => {
     if (animate) {
       dispatch({ type: 'SET_ANIMATE_SCORE', animateScore: true });
       dispatch({ type: 'SET_ANIMATE_STREAK', animateStreak: true });
@@ -608,8 +625,9 @@ const Wordle = ({ onBackToMenu }) => {
       dispatch({ type: 'SET_IS_LOADING', isLoading: false });
       refocusGameInput();
     }
-  };
+  }, [loadClueForWord, refocusGameInput, resetModalState, showMessage]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const startLadderGame = useCallback(async () => {
     dispatch({ type: 'SET_IS_LOADING', isLoading: true });
     try {
@@ -635,7 +653,7 @@ const Wordle = ({ onBackToMenu }) => {
       dispatch({ type: 'SET_IS_LOADING', isLoading: false });
       refocusGameInput();
     }
-  }, [refocusGameInput, startLadderStage]);
+  }, [refocusGameInput, showMessage, startLadderStage]);
 
   const startDailyLadderGame = useCallback(async (dateKey) => {
     dispatch({ type: 'SET_IS_LOADING', isLoading: true });
@@ -687,13 +705,14 @@ const Wordle = ({ onBackToMenu }) => {
       dispatch({ type: 'SET_IS_LOADING', isLoading: false });
       refocusGameInput();
     }
-  }, [getOrCreateDailyLadderWords, loadDailySavedState, refocusGameInput, startLadderStage]);
+  }, [getOrCreateDailyLadderWords, loadDailySavedState, refocusGameInput, showMessage, startLadderStage]);
 
   const startDailyGame = useCallback(async (dateKey) => {
     dispatch({ type: 'SET_IS_LOADING', isLoading: true });
     try {
       const normalizedDateKey = dateKey || getLocalDateKey();
-      const targetWord = getOrCreateDailyTargetWord(normalizedDateKey);
+      const dailyRecord = await getDailyWordRecord(normalizedDateKey);
+      const targetWord = await getOrCreateDailyTargetWord(normalizedDateKey);
 
       const saved = loadDailySavedState(GAME_MODE_DAILY, normalizedDateKey);
       if (saved && saved.targetWord === targetWord) {
@@ -724,7 +743,7 @@ const Wordle = ({ onBackToMenu }) => {
           dailyDateKey: normalizedDateKey,
           stats: loadStats(GAME_MODE_DAILY),
         });
-        const clue = await getOrCreateDailyClue(targetWord, normalizedDateKey);
+        const clue = await getOrCreateDailyClue(targetWord, normalizedDateKey, dailyRecord);
         dispatch({ type: 'SET_CLUE', clue });
         dispatch({ type: 'SET_SHOW_CLUE', showClue: true });
       }
@@ -735,7 +754,7 @@ const Wordle = ({ onBackToMenu }) => {
       dispatch({ type: 'SET_IS_LOADING', isLoading: false });
       refocusGameInput();
     }
-  }, [getOrCreateDailyTargetWord, getOrCreateDailyClue, loadDailySavedState, refocusGameInput]);
+  }, [getOrCreateDailyTargetWord, getOrCreateDailyClue, loadDailySavedState, refocusGameInput, showMessage]);
 
   useEffect(() => {
     runDailyStorageCleanupMigration();
@@ -752,14 +771,31 @@ const Wordle = ({ onBackToMenu }) => {
       }, 500);
       localStorage.setItem('eleanordle:hasSeenTutorial', 'true');
     }
-    // eslint-disable-next-line
-  }, [refocusGameInput]);
+  }, [refocusGameInput, runDailyStorageCleanupMigration, startDailyGame]);
 
   useEffect(() => {
     if (!isDailyMode(state.gameMode)) return;
-    // Persist after meaningful changes.
-    saveDailyState(state.gameMode, state.dailyDateKey, state);
+    saveDailyState(state.gameMode, state.dailyDateKey, {
+      guesses: state.guesses,
+      currentGuess: state.currentGuess,
+      currentRow: state.currentRow,
+      targetWord: state.targetWord,
+      activeWordLength: state.activeWordLength,
+      gameOver: state.gameOver,
+      isSuccess: state.isSuccess,
+      completedWord: state.completedWord,
+      evaluations: state.evaluations,
+      letterStates: state.letterStates,
+      ladderWords: state.ladderWords,
+      ladderStageIndex: state.ladderStageIndex,
+      ladderCompletedStages: state.ladderCompletedStages,
+      ladderGuessCounts: state.ladderGuessCounts,
+      ladderTotalGuesses: state.ladderTotalGuesses,
+      clue: state.clue,
+      showClue: state.showClue,
+    });
   }, [
+    state.activeWordLength,
     state.gameMode,
     state.dailyDateKey,
     state.guesses,
@@ -771,26 +807,15 @@ const Wordle = ({ onBackToMenu }) => {
     state.completedWord,
     state.evaluations,
     state.letterStates,
+    state.ladderWords,
+    state.ladderStageIndex,
+    state.ladderCompletedStages,
+    state.ladderGuessCounts,
+    state.ladderTotalGuesses,
     state.clue,
     state.showClue,
     saveDailyState,
   ]);
-
-  const handleKeyPress = (key) => {
-    if (state.gameOver) return;
-
-    if (key === 'ENTER') {
-      if (state.currentGuess.length !== state.activeWordLength) {
-        showMessage(`Word must be ${state.activeWordLength} letters`);
-        return;
-      }
-      submitGuess();
-    } else if (key === 'BACKSPACE') {
-      dispatch({ type: 'REMOVE_LAST_CURRENT_GUESS' });
-    } else if (/^[A-Z]$/.test(key)) {
-      dispatch({ type: 'APPEND_CURRENT_GUESS', key });
-    }
-  };
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -818,28 +843,6 @@ const Wordle = ({ onBackToMenu }) => {
       dispatch({ type: 'SET_INVALID_GUESS', invalidGuess: false });
     }
   }, [state.currentGuess, state.activeWordLength, state.invalidGuess]);
-
-  const evaluateGuess = (guess, target) => {
-    const evaluation = Array(target.length).fill('incorrect');
-    const targetLetters = target.split('');
-    const guessLetters = guess.split('');
-    for (let i = 0; i < target.length; i++) {
-      if (guessLetters[i] === targetLetters[i]) {
-        evaluation[i] = 'correct';
-        targetLetters[i] = null;
-        guessLetters[i] = null;
-      }
-    }
-    for (let i = 0; i < target.length; i++) {
-      if (guessLetters[i] === null) continue;
-      const targetIndex = targetLetters.indexOf(guessLetters[i]);
-      if (targetIndex !== -1) {
-        evaluation[i] = 'wrong-position';
-        targetLetters[targetIndex] = null;
-      }
-    }
-    return evaluation;
-  };
 
   const handleNextWord = useCallback(async () => {
     if (isLadderMode(state.gameMode)) {
@@ -875,6 +878,7 @@ const Wordle = ({ onBackToMenu }) => {
     startLadderGame,
     startLadderStage,
     startPracticeGame,
+    state.dailyDateKey,
     state.gameMode,
     state.isSuccess,
     state.ladderCompletedStages,
@@ -903,15 +907,15 @@ const Wordle = ({ onBackToMenu }) => {
     dispatch({ type: 'SET_SHOW_DEFINITION_MODAL', showDefinitionModal: true });
   };
 
-  const revealRowLetters = (rowIndex) => {
+  const revealRowLetters = useCallback((rowIndex) => {
     for (let i = 0; i < state.activeWordLength; i++) {
       setTimeout(() => {
         dispatch({ type: 'REVEAL_LETTER', rowIndex, letterIndex: i });
       }, i * 200);
     }
-  };
+  }, [state.activeWordLength]);
 
-  const submitGuess = async () => {
+  const submitGuess = useCallback(async () => {
     const isValid = await isValidWord(state.currentGuess);
     if (!isValid) {
       return;
@@ -1094,12 +1098,42 @@ const Wordle = ({ onBackToMenu }) => {
         dispatch({ type: 'SET_CURRENT_GUESS', currentGuess: '' });
       }, nextRowDelay);
     }
-  };
+  }, [
+    revealRowLetters,
+    state.activeWordLength,
+    state.currentGuess,
+    state.currentRow,
+    state.dailyDateKey,
+    state.evaluations,
+    state.gameMode,
+    state.guesses,
+    state.ladderCompletedStages,
+    state.ladderGuessCounts,
+    state.ladderStageIndex,
+    state.ladderTotalGuesses,
+    state.letterStates,
+    state.revealedLetters,
+    state.rowScores,
+    state.score,
+    state.targetWord,
+    state.wrongPositionHistory,
+  ]);
 
-  const showMessage = (msg) => {
-    dispatch({ type: 'SET_MESSAGE', message: msg });
-    setTimeout(() => dispatch({ type: 'SET_MESSAGE', message: '' }), 2000);
-  };
+  const handleKeyPress = useCallback((key) => {
+    if (state.gameOver) return;
+
+    if (key === 'ENTER') {
+      if (state.currentGuess.length !== state.activeWordLength) {
+        showMessage(`Word must be ${state.activeWordLength} letters`);
+        return;
+      }
+      submitGuess();
+    } else if (key === 'BACKSPACE') {
+      dispatch({ type: 'REMOVE_LAST_CURRENT_GUESS' });
+    } else if (/^[A-Z]$/.test(key)) {
+      dispatch({ type: 'APPEND_CURRENT_GUESS', key });
+    }
+  }, [showMessage, state.activeWordLength, state.currentGuess.length, state.gameOver, submitGuess]);
 
   const getTileClass = (letter, index, rowIndex) => {
     if (rowIndex > state.currentRow) return '';
@@ -1133,6 +1167,9 @@ const Wordle = ({ onBackToMenu }) => {
     const handleClick = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
+        setDailyMenuOpen(false);
+        setInfiniteMenuOpen(false);
+        setOptionsMenuOpen(false);
       }
     };
     if (state.menuOpen) {
@@ -1143,7 +1180,15 @@ const Wordle = ({ onBackToMenu }) => {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [state.menuOpen]);
 
-  const revealAnswer = async () => {
+  useEffect(() => {
+    if (!state.menuOpen) {
+      setDailyMenuOpen(false);
+      setInfiniteMenuOpen(false);
+      setOptionsMenuOpen(false);
+    }
+  }, [state.menuOpen]);
+
+  const revealAnswer = useCallback(async () => {
     if (state.gameOver) return;
     if (isDailyMode(state.gameMode)) {
       showMessage('Daily mode: no reveals');
@@ -1194,7 +1239,18 @@ const Wordle = ({ onBackToMenu }) => {
       }
     }, state.activeWordLength * 200 + 200);
     dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
-  };
+  }, [
+    revealRowLetters,
+    showMessage,
+    state.activeWordLength,
+    state.evaluations,
+    state.gameMode,
+    state.gameOver,
+    state.guesses,
+    state.letterStates,
+    state.revealedLetters,
+    state.targetWord,
+  ]);
 
   const getClue = useCallback(async () => {
     if (state.targetWord) {
@@ -1254,7 +1310,7 @@ const Wordle = ({ onBackToMenu }) => {
       }
     }
     refocusGameInput();
-  }, [refocusGameInput, state.activeWordLength, state.evaluations, state.guesses, state.usedSuggestions, state.targetWord]);
+  }, [refocusGameInput, showMessage, state.activeWordLength, state.evaluations, state.guesses, state.usedSuggestions, state.targetWord]);
 
   useEffect(() => {
     if (state.pendingSuggestion && state.currentGuess.length === state.activeWordLength) {
@@ -1264,13 +1320,7 @@ const Wordle = ({ onBackToMenu }) => {
     // eslint-disable-next-line
   }, [state.pendingSuggestion, state.currentGuess, state.activeWordLength]);
 
-  const absentLetters = Array.from(new Set(
-    state.guesses
-      .join('')
-      .split('')
-      .filter(l => l && !state.targetWord.includes(l))
-  ));
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const handleMenuShortcuts = (e) => {
       if (e.altKey && e.shiftKey && !e.ctrlKey) {
@@ -1449,6 +1499,11 @@ const Wordle = ({ onBackToMenu }) => {
               aria-label="Open menu"
               onMouseDown={preventButtonFocus}
               onClick={() => {
+                if (state.menuOpen) {
+                  setDailyMenuOpen(false);
+                  setInfiniteMenuOpen(false);
+                  setOptionsMenuOpen(false);
+                }
                 dispatch({ type: 'SET_MENU_OPEN', menuOpen: !state.menuOpen });
                 refocusGameInput();
               }}
@@ -1475,7 +1530,7 @@ const Wordle = ({ onBackToMenu }) => {
                       } catch {
                         showMessage('Copy failed');
                       }
-                      dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
+                      closeMenu();
                       refocusGameInput();
                     }}
                     className="dropdown-item"
@@ -1484,89 +1539,146 @@ const Wordle = ({ onBackToMenu }) => {
                   </button>
                 )}
 
-                <button
-                  onMouseDown={preventButtonFocus}
-                  onClick={() => {
-                    dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
-                    startDailyGame(getLocalDateKey());
-                  }}
-                  className="dropdown-item"
-                >
-                  Daily
-                </button>
-                <button
-                  onMouseDown={preventButtonFocus}
-                  onClick={() => {
-                    dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
-                    startDailyLadderGame(getLocalDateKey());
-                  }}
-                  className="dropdown-item"
-                >
-                  Daily Ladder
-                </button>
-                <button
-                  onMouseDown={preventButtonFocus}
-                  onClick={() => {
-                    dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
-                    startPracticeGame(true);
-                  }}
-                  className="dropdown-item"
-                >
-                  Infinite
-                </button>
-                <button
-                  onMouseDown={preventButtonFocus}
-                  onClick={() => {
-                    dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
-                    startLadderGame();
-                  }}
-                  className="dropdown-item"
-                >
-                  Ladder
-                </button>
-                <button
-                  onMouseDown={preventButtonFocus}
-                  onClick={() => {
-                    dispatch({ type: 'SET_IS_CONTRAST_MODE', isContrastMode: !state.isContrastMode });
-                    refocusGameInput();
-                  }}
-                  className="dropdown-item"
-                >
-                  Contrast Mode
-                </button>
-                <button
-                  onMouseDown={preventButtonFocus}
-                  onClick={() => {
-                    const next = !state.isDarkMode;
-                    dispatch({ type: 'SET_IS_DARK_MODE', isDarkMode: next });
-                    localStorage.setItem('darkMode', next);
-                    refocusGameInput();
-                  }}
-                  className="dropdown-item"
-                >
-                  {state.isDarkMode ? 'Light Mode' : 'Dark Mode'}
-                </button>
-                <button
-                  onMouseDown={preventButtonFocus}
-                  onClick={() => {
-                    dispatch({ type: 'SET_MIC_ENABLED', micEnabled: !state.micEnabled });
-                    refocusGameInput();
-                  }}
-                  className="dropdown-item"
-                >
-                  {state.micEnabled ? 'Disable Microphone' : 'Enable Microphone'}
-                </button>
-                <button
-                  onMouseDown={preventButtonFocus}
-                  onClick={() => {
-                    dispatch({ type: 'SET_MENU_OPEN', menuOpen: false });
-                    dispatch({ type: 'SET_SHOW_TUTORIAL', showTutorial: true });
-                    refocusGameInput();
-                  }}
-                  className="dropdown-item"
-                >
-                  Tutorial
-                </button>
+                <div className="dropdown-submenu">
+                  <button
+                    onMouseDown={preventButtonFocus}
+                    onClick={() => {
+                      setDailyMenuOpen((current) => !current);
+                      refocusGameInput();
+                    }}
+                    className="dropdown-item dropdown-submenu-trigger"
+                    aria-expanded={dailyMenuOpen}
+                    aria-haspopup="true"
+                  >
+                    <span>Daily</span>
+                    <span className={`dropdown-caret ${dailyMenuOpen ? 'open' : ''}`} aria-hidden="true">▸</span>
+                  </button>
+                  {dailyMenuOpen && (
+                    <div className="dropdown-submenu-items">
+                      <button
+                        onMouseDown={preventButtonFocus}
+                        onClick={() => {
+                          closeMenu();
+                          startDailyGame(getLocalDateKey());
+                        }}
+                        className="dropdown-item dropdown-subitem"
+                      >
+                        Daily
+                      </button>
+                      <button
+                        onMouseDown={preventButtonFocus}
+                        onClick={() => {
+                          closeMenu();
+                          startDailyLadderGame(getLocalDateKey());
+                        }}
+                        className="dropdown-item dropdown-subitem"
+                      >
+                        Daily Ladder
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="dropdown-submenu">
+                  <button
+                    onMouseDown={preventButtonFocus}
+                    onClick={() => {
+                      setInfiniteMenuOpen((current) => !current);
+                      refocusGameInput();
+                    }}
+                    className="dropdown-item dropdown-submenu-trigger"
+                    aria-expanded={infiniteMenuOpen}
+                    aria-haspopup="true"
+                  >
+                    <span>Infinite</span>
+                    <span className={`dropdown-caret ${infiniteMenuOpen ? 'open' : ''}`} aria-hidden="true">▸</span>
+                  </button>
+                  {infiniteMenuOpen && (
+                    <div className="dropdown-submenu-items">
+                      <button
+                        onMouseDown={preventButtonFocus}
+                        onClick={() => {
+                          closeMenu();
+                          startPracticeGame(true);
+                        }}
+                        className="dropdown-item dropdown-subitem"
+                      >
+                        Infinite
+                      </button>
+                      <button
+                        onMouseDown={preventButtonFocus}
+                        onClick={() => {
+                          closeMenu();
+                          startLadderGame();
+                        }}
+                        className="dropdown-item dropdown-subitem"
+                      >
+                        Ladder
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="dropdown-submenu">
+                  <button
+                    onMouseDown={preventButtonFocus}
+                    onClick={() => {
+                      setOptionsMenuOpen((current) => !current);
+                      refocusGameInput();
+                    }}
+                    className="dropdown-item dropdown-submenu-trigger"
+                    aria-expanded={optionsMenuOpen}
+                    aria-haspopup="true"
+                  >
+                    <span>Options</span>
+                    <span className={`dropdown-caret ${optionsMenuOpen ? 'open' : ''}`} aria-hidden="true">▸</span>
+                  </button>
+                  {optionsMenuOpen && (
+                    <div className="dropdown-submenu-items">
+                      <button
+                        onMouseDown={preventButtonFocus}
+                        onClick={() => {
+                          dispatch({ type: 'SET_IS_CONTRAST_MODE', isContrastMode: !state.isContrastMode });
+                          refocusGameInput();
+                        }}
+                        className="dropdown-item dropdown-subitem"
+                      >
+                        Contrast Mode
+                      </button>
+                      <button
+                        onMouseDown={preventButtonFocus}
+                        onClick={() => {
+                          const next = !state.isDarkMode;
+                          dispatch({ type: 'SET_IS_DARK_MODE', isDarkMode: next });
+                          localStorage.setItem('darkMode', next);
+                          refocusGameInput();
+                        }}
+                        className="dropdown-item dropdown-subitem"
+                      >
+                        {state.isDarkMode ? 'Light Mode' : 'Dark Mode'}
+                      </button>
+                      <button
+                        onMouseDown={preventButtonFocus}
+                        onClick={() => {
+                          dispatch({ type: 'SET_MIC_ENABLED', micEnabled: !state.micEnabled });
+                          refocusGameInput();
+                        }}
+                        className="dropdown-item dropdown-subitem"
+                      >
+                        {state.micEnabled ? 'Disable Microphone' : 'Enable Microphone'}
+                      </button>
+                      <button
+                        onMouseDown={preventButtonFocus}
+                        onClick={() => {
+                          closeMenu();
+                          dispatch({ type: 'SET_SHOW_TUTORIAL', showTutorial: true });
+                          refocusGameInput();
+                        }}
+                        className="dropdown-item dropdown-subitem"
+                      >
+                        Tutorial
+                      </button>
+                    </div>
+                  )}
+                </div>
                 
               </div>
             )}

@@ -152,6 +152,9 @@
   background: none;
   border: none;
   text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 12px 20px;
   font-size: 1rem;
   color: #333;
@@ -161,6 +164,35 @@
 
 .dropdown-item:hover {
   background: #f0f0f0;
+}
+
+.dropdown-submenu {
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-submenu-trigger {
+  width: 100%;
+}
+
+.dropdown-submenu-items {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+}
+
+.dropdown-subitem {
+  padding-left: 34px;
+  justify-content: flex-start;
+}
+
+.dropdown-caret {
+  font-size: 0.9rem;
+  transition: transform 0.15s ease;
+}
+
+.dropdown-caret.open {
+  transform: rotate(90deg);
 }
 
 .game-container {

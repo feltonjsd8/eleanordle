@@ -38,6 +38,70 @@ npm start
 
 Open http://localhost:3000 in your browser to play.
 
+## Daily and ladder content database
+
+Daily mode and ladder mode now read their word pools from a bundled SQLite database instead of selecting directly from in-app arrays or live API results.
+
+- Database file: `public/game-content.sqlite`
+- SQLite runtime asset: `public/sql-wasm.wasm`
+- Browser loader: `src/services/gameDatabase.js`
+- Selection/lookup logic: `src/services/dictionaryService.js`
+- Population script: `scripts/gameDb.mjs`
+
+The bundled database currently contains:
+
+- `daily`: 3000 five-letter words with definitions
+- `ladder`: 3000 total words with definitions, split across 4, 5, and 6 letters
+- Each row also includes a `difficulty` rating from `1` (easier clue) to `5` (harder clue)
+
+### Populate from Datamuse
+
+To rebuild the database from Datamuse:
+
+```bash
+npm run db:populate
+```
+
+This fetches Datamuse words and definitions, filters profanity, writes the SQLite database, and copies the `sql.js` wasm asset into `public`.
+
+### Select or override words manually
+
+You can update or disable specific entries in the database without regenerating the full dataset.
+
+Upsert a word:
+
+```bash
+npm run db:upsert -- --game daily --word APPLE --definition "A round fruit" --part-of-speech noun
+```
+
+You can also override the automatic rating:
+
+```bash
+npm run db:upsert -- --game daily --word APPLE --definition "A round fruit" --difficulty 1
+```
+
+Refresh schema and backfill difficulty ratings on the existing database:
+
+```bash
+npm run db:migrate -- --force true
+```
+
+Remove any rows where the definition gives away the answer word, or where the word/definition contains profanity:
+
+```bash
+npm run db:prune
+```
+
+Disable a word:
+
+```bash
+npm run db:disable -- --game ladder --word GRAPE
+```
+
+Supported game values are `daily` and `ladder`.
+
+Daily mode uses a deterministic hash of the date to choose one enabled `daily` entry. Daily ladder uses the enabled `ladder` entries for 4, 5, and 6-letter stages, also chosen deterministically by date.
+
 ## Where to look in the code
 
 - The main game components are in `src/components` (Wordle, WordModal, DefinitionModal).

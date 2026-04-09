@@ -1,9 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import Wordle from '../components/Wordle';
-import DAILY_WORDS from '../services/wordList';
 
-// Mock the dictionary service (daily uses getDictionaryWords)
 jest.mock('../services/dictionaryService', () => ({
   getRandomWord: jest.fn((excludeWords = [], length = 5) => {
     if (length === 4) return Promise.resolve('MOSS');
@@ -17,6 +15,8 @@ jest.mock('../services/dictionaryService', () => ({
   }),
   getWordDefinition: jest.fn((word) => Promise.resolve({ word, definitions: [{ definition: `Definition for ${word}` }] })),
   isValidWord: jest.fn(() => Promise.resolve(true)),
+  getDailyWordRecord: jest.fn(() => Promise.resolve({ word: 'APPLE', definition: 'Definition for APPLE' })),
+  getDailyLadderWords: jest.fn(() => Promise.resolve(['MOSS', 'GRAPE', 'PLANET'])),
 }));
 
 jest.mock('../services/suggestionService', () => ({
@@ -44,6 +44,8 @@ describe('Wordle Component', () => {
     });
     dictionaryService.getWordDefinition.mockImplementation((word) => Promise.resolve({ word, definitions: [{ definition: `Definition for ${word}` }] }));
     dictionaryService.isValidWord.mockImplementation(() => Promise.resolve(true));
+    dictionaryService.getDailyWordRecord.mockImplementation(() => Promise.resolve({ word: 'APPLE', definition: 'Definition for APPLE' }));
+    dictionaryService.getDailyLadderWords.mockImplementation(() => Promise.resolve(['MOSS', 'GRAPE', 'PLANET']));
   });
 
   const getTodayKey = () => {
@@ -52,15 +54,6 @@ describe('Wordle Component', () => {
     const m = String(d.getUTCMonth() + 1).padStart(2, '0');
     const day = String(d.getUTCDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
-  };
-
-  const hashToUint32 = (str) => {
-    let hash = 2166136261;
-    for (let i = 0; i < str.length; i++) {
-      hash ^= str.charCodeAt(i);
-      hash = Math.imul(hash, 16777619);
-    }
-    return hash >>> 0;
   };
 
   it('defaults to Daily mode and hides reveal option', async () => {
@@ -105,7 +98,7 @@ describe('Wordle Component', () => {
 
   it('masks the target word when it appears in a cached daily clue', async () => {
     const dateKey = getTodayKey();
-    const targetWord = DAILY_WORDS[hashToUint32(dateKey) % DAILY_WORDS.length];
+    const targetWord = 'APPLE';
     const clueKey = `eleanordle:daily:${dateKey}:clue`;
     const targetKey = `eleanordle:daily:${dateKey}:targetWord`;
 
@@ -144,7 +137,7 @@ describe('Wordle Component', () => {
   });
 
   it('starts daily ladder mode with the seeded ladder words and daily restrictions', async () => {
-    const { getDictionaryWords, getRandomWord } = require('../services/dictionaryService');
+    const { getDailyLadderWords, getRandomWord } = require('../services/dictionaryService');
 
     render(<Wordle />);
     await screen.findByTitle('Eleanordle');
@@ -154,9 +147,7 @@ describe('Wordle Component', () => {
 
     await screen.findByText(/Daily Ladder: Stage 1 of 3: 4-letter word/);
 
-    expect(getDictionaryWords).toHaveBeenCalledWith(expect.any(Number), 4);
-    expect(getDictionaryWords).toHaveBeenCalledWith(expect.any(Number), 5);
-    expect(getDictionaryWords).toHaveBeenCalledWith(expect.any(Number), 6);
+  expect(getDailyLadderWords).toHaveBeenCalledWith(expect.any(String));
     expect(getRandomWord).not.toHaveBeenCalledWith([], 4);
     expect(screen.getByLabelText('Wordle guess input')).toHaveAttribute('maxlength', '4');
     expect(screen.queryByLabelText('Suggest Word')).not.toBeInTheDocument();
